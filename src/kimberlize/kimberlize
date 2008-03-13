@@ -1,0 +1,227 @@
+#!/bin/sh
+
+usage()
+{
+	echo \
+	usage: `basename $0` [-l login-name] [-p port] [-n] \
+\<vm-name\> \<app-name\> 
+}
+
+if [ $# -lt 2 ]; then
+	usage
+	exit 1
+fi
+
+snapshot_name="diamond_app"
+login_name="diamond"
+login_port=2222
+compression=1
+homedir=`printenv HOME`
+
+while getopts ":l:np:h" Option
+do
+	case $Option in
+		l) 	
+			echo "Using login name '$OPTARG'.."
+			login_name=$OPTARG
+			;;
+		n) 	
+			echo "Disabling compression.."
+			compression=0
+			;;
+		p) 	
+			echo "Using port '$OPTARG'.."
+			login_port=$OPTARG
+			;;
+		h)
+			usage
+			exit
+			;;
+		?)	
+			usage
+			exit
+			;;
+	esac
+done
+shift $(($OPTIND-1))
+
+
+echo
+echo "Installing application '$2' in VM '$1'.."
+
+
+########################################################################
+# Port forward local port to VM (TCP host:2222->guest:22)
+#
+
+echo 
+echo "Port forwarding (host:$login_port -> guest:22) for SSH.."
+VBoxManage setextradata $1 "VBoxInternal/Devices/pcnet/0/LUN#0/Config/diamond_ssh/HostPort" $login_port > /dev/null
+VBoxManage setextradata $1 "VBoxInternal/Devices/pcnet/0/LUN#0/Config/diamond_ssh/GuestPort" 22 > /dev/null
+VBoxManage setextradata $1 "VBoxInternal/Devices/pcnet/0/LUN#0/Config/diamond_ssh/Protocol" TCP > /dev/null
+
+
+########################################################################
+# Create a preliminary snapshot of the virtual machine while it is suspended.
+# This saves the in-memory state, allowing us to take a binary difference
+# later.
+#
+
+echo
+echo "Snapshotting VM '$1'.."
+VBoxManage snapshot $1 take $snapshot_name > /dev/null
+if [ $? -ne 0 ]; then
+	echo `basename $0`: error: failed taking VM snapshot
+    exit 1
+fi
+
+
+########################################################################
+# Launch VM using VirtualBox.  Now we will create our custom state.
+#
+
+echo
+echo "Resuming VM '$1'.."
+VBoxManage startvm $1 > /dev/null
+#-type vrdp
+if [ $? -ne 0 ]; then
+	echo `basename $0`: error: failed resuming VM
+    exit 1
+fi
+echo "Resume in progess.  Sleeping 30s while the VM loads and DHCPs.."
+sleep 30s
+
+
+########################################################################
+# Execute application installer and application inside VM
+#
+
+echo
+echo "Executing install script '$2-install' inside VM.."
+scp -P $login_port $2-install $login_name@localhost:/tmp
+ssh -t -l $login_name -p $login_port localhost /tmp/$2-install
+
+echo
+echo "Executing application script '$2-execute' inside VM.."
+scp -P $login_port $2-execute $login_name@localhost:/tmp
+ssh -f -l $login_name -p $login_port localhost /tmp/$2-execute
+sleep 5s
+
+
+########################################################################
+# Execute zerofree, which cleans freed blocks, increasing compressibility.
+# This is turned off for now due to the fact that zerofree needs to
+# change runlevels, which may trash memory state.
+
+zf=`printenv ZEROFREE`;
+if [ "$zf" != "" ]; then
+	echo
+	echo "Zerofree-ing the guest VM to decrease its size.."
+	scp $zf $login_name@localhost:~/ :-P $login_port
+	scp zerofree_script $login_name@localhost:~/ :-P $login_port
+	sudo telinit 1
+	ssh -f -l $login_name -p $login_port localhost ~/$zf
+	sudo telinit 5
+fi
+
+
+########################################################################
+# Tear down the VM, writing the in-memory state to disk (.sav)
+#
+
+echo
+echo "Suspending VM $1 (saving state).."
+VBoxManage controlvm $1 savestate > /dev/null
+if [ $? -ne 0 ]; then
+    echo `basename $0`: error: failed suspending VM state
+    exit 1
+fi
+
+
+########################################################################
+# Parse the various UUIDs used in filename construction.
+#
+
+mem_snapshot_uuid=`cat $homedir/.VirtualBox/Machines/$1/$1.xml | grep currentSnapshot | cut -f4 -d'"' | sed -e 's/{//g' | sed -e 's/}//g'`
+mem_snapshot_file="$homedir/.VirtualBox/Machines/$1/Snapshots/{${mem_snapshot_uuid}}.sav"
+
+mem_current_uuid=`cat $homedir/.VirtualBox/Machines/$1/$1.xml | grep stateFile | head -1 | cut -f12 -d'"' | cut -f2 -d'{' | cut -f1 -d'}'` 
+mem_current_file="$homedir/.VirtualBox/Machines/$1/Snapshots/{${mem_current_uuid}}.sav"
+
+disk_current_uuid=`cat $homedir/.VirtualBox/Machines/$1/$1.xml | grep hardDisk | tail -1 | cut -f6 -d'"' | sed -e 's/{//g' | sed -e 's/}//g'`
+disk_current_file="$homedir/.VirtualBox/Machines/$1/Snapshots/{${disk_current_uuid}}.vdi"
+
+
+########################################################################
+# Piece together the tarball that dekimberlize will use to apply state.
+# Take binary diff of in-memory state using xdelta.
+# This can vastly reduce the amount of memory transferred.
+#
+
+rm -rf /tmp/$1/
+mkdir -p /tmp/$1/Snapshots/
+
+echo
+echo "Taking the delta between current in-memory state and the checkpoint's.."
+xdelta delta $mem_snapshot_file $mem_current_file /tmp/$1/Snapshots/${mem_snapshot_uuid}.diff
+
+echo
+echo "Taking the delta between current disk image and the checkpoint's.."
+#scp $disk_current_file /tmp/$1/Snapshots/
+scp $homedir/.VirtualBox/Machines/$1/Snapshots/*.vdi /tmp/$1/Snapshots/
+scp $homedir/.VirtualBox/Machines/$1/$1.xml /tmp/$1/$1.xml
+scp $homedir/.VirtualBox/VirtualBox.xml /tmp/$1/VirtualBox.xml
+tar cf $2-app_state.tar -C /tmp $1
+ls -lR /tmp/$1
+rm -rf /tmp/$1
+
+if [ $compression -eq 1 ]; then
+	echo
+	echo "Compressing.."
+	lzma $2-app_state.tar
+else
+	echo
+	echo "Compression disabled, ignoring.."
+fi
+
+
+########################################################################
+# Now clean up, deleting the unnecessary checkpoint and removing
+# the port forwarding.
+#
+
+echo
+echo "Discarding new state of VM '$1' and reverting to the checkpoint.."
+VBoxManage snapshot $1 discardcurrent -all > /dev/null
+if [ $? -ne 0 ]; then
+    echo `basename $0`: error: failed discarding VM snapshot '$snapshot_name' 
+fi
+
+VBoxManage setextradata $1 "VBoxInternal/Devices/pcnet/0/LUN#0/Config/diamond_ssh/HostPort" > /dev/null
+VBoxManage setextradata $1 "VBoxInternal/Devices/pcnet/0/LUN#0/Config/diamond_ssh/GuestPort" > /dev/null
+VBoxManage setextradata $1 "VBoxInternal/Devices/pcnet/0/LUN#0/Config/diamond_ssh/Protocol" > /dev/null
+
+
+echo
+echo -n "Complete!  Your state is in the file '$2-app_state.tar"
+if [ $compression -eq 1 ]; then
+	echo ".lzma'"
+else
+	echo "'"
+fi
+
+
+########################################################################
+# Info:
+# *.vdi represent virtual disk images.  The oldest is the original install,
+#   stored in a user's ~/.VirtualBox/VDI/ directory.  It is kept pristine.
+#   The active difference file is updated whenever the virtual disk is written,
+#   and copied to a saved file whenever a snapshot is taken.
+#
+# *.sav represent saved runtime state, including both in-memory and on-disk
+#   changes.  During snapshot, the entire file is saved, with on-disk changes
+#   also replicated into a .vdi file.  They average 200-300 MB.
+#
+# It is expected that the launcher running on a display will hoard the
+# "generic" pristine .vdi file as well as the snapshotted memory state.
+#

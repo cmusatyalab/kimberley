@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<node name="/edu/cmu/cs/diamond/opendiamond/dcm">
+  <interface name="edu.cmu.cs.diamond.opendiamond.dcm">
+    <method name="server">
+      <arg type="s" name="service_name" direction="in" />
+      <arg type="u" name="port" direction="in" />
+    </method>
+    <method name="client">
+      <arg type="s" name="service_name" direction="in" />
+      <arg type="u" name="port" direction="out" />
+    </method>
+  </interface>
+</node>

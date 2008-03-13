@@ -1,0 +1,45 @@
+#!/bin/sh
+
+
+########################################################################
+# install packages and dependencies
+#
+
+wget -O /tmp/opencv1_1.0.0-1_i386.deb http://solitaire.diamond.cs.cmu.edu/opencv1_1.0.0-1_i386.deb
+wget -O /tmp/opendiamond_3.2.1_i386.deb http://solitaire.diamond.cs.cmu.edu/opendiamond_3.2.1_i386.deb
+wget -O /tmp/imagejfind_1.0.6_i386.deb http://solitaire.diamond.cs.cmu.edu/imagejfind_1.0.6_i386.deb
+wget -O /home/diamond/Dense.txt http://solitaire.diamond.cs.cmu.edu/Dense.txt
+sudo apt-get -y update
+sudo dpkg -i /tmp/opencv1_1.0.0-1_i386.deb
+sudo dpkg -i /tmp/opendiamond_3.2.1_i386.deb
+sudo dpkg -i /tmp/imagejfind_1.0.6_i386.deb
+sudo apt-get -f -y install 
+sudo apt-get -y install g++
+sudo wget -O /usr/local/share/imagejfind/filter/fil_rgb.so http://solitaire.diamond.cs.cmu.edu/fil_rgb.so
+
+
+########################################################################
+# Setup initial Diamond state
+#
+
+mkdir -p ~/.diamond/
+
+wget -O ~/.diamond/name_map http://solitaire.diamond.cs.cmu.edu/imagejfind_name_map
+wget -O ~/.diamond/gid_map http://solitaire.diamond.cs.cmu.edu/imagejfind_gid_map
+
+echo "DATAROOT /home/diamond/" > ~/.diamond/diamond_config
+echo "INDEXDIR /home/diamond/" >> ~/.diamond/diamond_config
+echo "CACHEDIR /home/diamond/" >> ~/.diamond/diamond_config
+echo "DATATYPE NATIVE" >> ~/.diamond/diamond_config
+
+
+########################################################################
+# Cleanup
+#
+
+sudo apt-get clean
+rm -f /tmp/*.deb
+sudo rm -f /var/cache/apt/partial/*
+sudo rm -f /var/lib/apt/lists/*_Packages
+sudo rm -f /var/lib/apt/lists/*_Sources
+sudo rm -f /var/lib/apt/lists/*_Release

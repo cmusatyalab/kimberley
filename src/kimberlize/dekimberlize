@@ -1,0 +1,215 @@
+#!/bin/sh
+
+usage()
+{
+	echo "usage: `basename $0` [-p port] <[-f file] || [-i URL]> <vm-name>"
+}
+
+failure()
+{
+	rm -f /tmp/dekimberlize.lock
+	exit 1
+}
+
+if [ $# -lt 3 ]; then
+	usage
+	exit 1
+fi
+
+# Randomly generated port to connect to OpenDiamond on.  Forwarded directly.
+homedir=`printenv HOME`
+
+
+while getopts ":f:i:h" Option
+do
+    case $Option in
+        f)
+            echo "Using kimberlize patch file '$OPTARG'.."
+			patch_file=$OPTARG
+            ;;
+        i)
+            echo "Downloading and using kimberlize patch file '$OPTARG'.."
+			patch_file=`basename $OPTARG`
+			wget -O /tmp/$patch_file $OPTARG
+            patch_file=/tmp/$patch_file
+            ;;
+        h)
+            usage
+            exit 0
+            ;;
+        ?)
+            usage
+            exit 1
+            ;;
+    esac
+done
+shift $(($OPTIND-1))
+
+
+########################################################################
+# Check to see the environment is acceptable to execute in, i.e. that
+# another dekimberlize process isn't already running, that necessary
+# files exist in expected places, etc.
+#
+
+echo
+
+if [ -d $homedir/.VirtualBox/Machines/$1/ ]; then
+	echo "Found:  $homedir/.VirtualBox/Machines/$1/"
+else
+	echo "!! Could not find:"
+	echo "       $homedir/.VirtualBox/Machines/$1/"
+	echo "   Please check the name of your virtual machine."
+	exit 1
+fi
+
+if [ -e $homedir/.VirtualBox/Machines/$1/$1.xml ]; then
+	echo "Found:  $homedir/.VirtualBox/Machines/$1/$1.xml"
+else
+	echo "!! Could not find:"
+	echo "       $homedir/.VirtualBox/Machines/$1/$1.xml"
+	echo "   Please check that your VM state is not corrupt."
+	exit 1
+fi
+
+if [ -e /tmp/dekimberlize.lock ]; then
+	echo "!! Found:"
+	echo "       /tmp/dekimberlize.lock"
+	echo "   Another kimberlized application is running within VirtualBox."
+    echo "   Please finish using it before trying another application."
+	exit 1	
+fi
+
+touch /tmp/dekimberlize.lock
+rm -f /tmp/dekimberlize_finished
+
+
+########################################################################
+# Apply kimberlized tarball to the specified VM.
+#
+
+# decompress if necessary
+echo
+echo "Checking for compression.."
+compressed=`echo $patch_file | grep lzma`
+if [ "$compressed" != "" ]; then
+    echo "Decompressing.."
+    output_file=`basename $patch_file`
+    output_file=/tmp/output_file
+	lzcat $patch_file > $output_file
+	patch_file=$output_file
+	echo "New patch file: $patch_file"
+fi
+
+# untar into VM's directory;  this will overwrite the .xml metadata file,
+# add the Snapshots/*.vdi binary difference to the disk state, and also
+# add a .diff file repesenting the binary difference in memory state,
+# which must be parsed.  Also, save the names of files we create.
+
+echo
+echo "Untarring.."
+tar xf $patch_file -C $homedir/.VirtualBox/Machines/
+
+mem_snapshot_uuid=`tar tf $patch_file | grep .diff | cut -f3 -d'/' | cut -f1 -d'.'`
+mem_current_uuid=`cat $homedir/.VirtualBox/Machines/$1/$1.xml | grep stateFile | head -1 | cut -f12 -d'"' | cut -f2 -d'{' | cut -f1 -d'}'`
+mem_current_file=$homedir/.VirtualBox/Machines/$1/Snapshots/{$mem_current_uuid}.sav
+mem_snapshot_diff=$homedir/.VirtualBox/Machines/$1/Snapshots/${mem_snapshot_uuid}.diff
+mem_snapshot_file=$homedir/.VirtualBox/Machines/$1/Snapshots/{$mem_snapshot_uuid}.sav
+echo "Moving current memory state:"
+echo "      $mem_current_file "
+echo "  to snapshot:"
+echo "      $mem_snapshot_file"
+mv $mem_current_file $mem_snapshot_file
+
+mv $homedir/.VirtualBox/Machines/$1/VirtualBox.xml $homedir/.VirtualBox/
+
+echo
+echo "Applying delta ($mem_snapshot_diff) of memory state.."
+xdelta patch $mem_snapshot_diff $mem_snapshot_file $mem_current_file
+chmod 600 $mem_current_file
+rm $mem_snapshot_diff
+
+echo
+echo "Port forwarding (host:2222 -> guest:22).."
+VBoxManage setextradata $1 "VBoxInternal/Devices/pcnet/0/LUN#0/Config/diamond_ssh/HostPort" 2222 > /dev/null
+VBoxManage setextradata $1 "VBoxInternal/Devices/pcnet/0/LUN#0/Config/diamond_ssh/GuestPort" 22 > /dev/null
+VBoxManage setextradata $1 "VBoxInternal/Devices/pcnet/0/LUN#0/Config/diamond_ssh/Protocol" TCP > /dev/null
+
+
+########################################################################
+# Launch VM using VirtualBox.  Now we will create our custom state.
+#
+
+echo
+echo "Resuming VM '$1'.."
+VBoxManage startvm $1 > /dev/null
+if [ $? -ne 0 ]; then
+	echo `basename $0`: error: failed resuming VM
+    failure 
+fi
+
+
+########################################################################
+# Wait for the user to complete his interaction by waiting for the
+# launcher application to signal us that the connection has been closed.
+# This is done by touching /tmp/dekimberlize_finished in the host.
+#
+
+echo "VM loaded! Waiting for the user to finish.."
+while [ ! -e /tmp/dekimberlize_finished ]; do
+	printf . || true
+	sleep 1s
+done
+
+echo
+echo "The user has ended the session."
+
+
+########################################################################
+# Now clean up, tossing the dirty state and removing the port forwarding.
+#
+
+echo
+echo "Powering VM $1 down.."
+VBoxManage controlvm $1 poweroff
+if [ $? -ne 0 ]; then
+    echo `basename $0`: error: failed powering VM down
+    failure
+fi
+
+sleep 2s
+
+echo
+echo "Discarding dirty state and restoring the original VM image.."
+VBoxManage snapshot $1 discardcurrent -all 
+if [ $? -ne 0 ]; then
+    echo `basename $0`: error: failed discarding VM state
+    failure 
+fi
+
+VBoxManage setextradata $1 "VBoxInternal/Devices/pcnet/0/LUN#0/Config/diamond_ssh/HostPort" > /dev/null
+VBoxManage setextradata $1 "VBoxInternal/Devices/pcnet/0/LUN#0/Config/diamond_ssh/GuestPort" > /dev/null
+VBoxManage setextradata $1 "VBoxInternal/Devices/pcnet/0/LUN#0/Config/diamond_ssh/Protocol" > /dev/null
+
+
+rm /tmp/dekimberlize.lock
+
+
+echo
+echo "Complete!"
+
+
+########################################################################
+# Info:
+# *.vdi represent virtual disk images.  The oldest is the original install,
+#   stored in a user's ~/.VirtualBox/VDI/ directory.  It is kept pristine.
+#   The active difference file is updated whenever the virtual disk is written,
+#   and copied to a saved file whenever a snapshot is taken.
+#
+# *.sav represent saved runtime state, including both in-memory and on-disk
+#   changes.  During snapshot, the entire file is saved, with on-disk changes
+#   also replicated into a .vdi file.  They average 200-300 MB.
+#
+# It is expected that the launcher running on a display will hoard the
+# "generic" pristine .vdi file as well as the snapshotted memory state.
+#

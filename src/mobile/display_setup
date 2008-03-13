@@ -1,0 +1,37 @@
+#!/bin/sh
+
+########################################################################
+# Create a new X server which will contain only the application
+# Use a 5:3 screen ratio, maximizing the size of the X dimension
+# on the display
+#
+
+x_res=`xdpyinfo | grep dimensions | head -1 | sed -e 's/ //g' | cut -f2 -d':' | cut -f1 -d'x'`
+y_res=`echo $x_res*3/5 | bc`
+resolution=`echo "$x_res\c"; echo "x\c"; echo "$y_res\c"`
+
+
+########################################################################
+# Set up VNC server to allow remote connection to new X server
+#
+scale=`echo "770/\c"; echo "$x_res\c"`
+
+x11vnc -once -display :0.0 -scale $scale > /tmp/x11vnc_port 2> /dev/null &
+
+sleep 5s
+
+
+########################################################################
+# Begin running dekimberlize in this new VM asap to load application
+#
+
+DISPLAY=:0.0 dekimberlize $1 $2 $3
+
+
+########################################################################
+# Once dekimberlize finishes, take down processes brought 
+# up by display_setup
+#
+
+killall x11vnc
+rm -f /tmp/x11vnc_port
