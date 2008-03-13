@@ -1,0 +1,12 @@
+.deps
+*.o
+*~
+dcm_dbus_app_glue.h
+display_launcher
+mobile_launcher
+rpc_mobile_launcher.h
+*.x
+*_svc.c
+*_clnt.c
+*_xdr.c
+stamp-h1
