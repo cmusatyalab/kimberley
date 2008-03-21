@@ -4,10 +4,12 @@
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <sys/stat.h>
-#include <fcntl.h>
 #include <errno.h>
-#include <netdb.h>
+#include <fcntl.h>
 #include <glib.h>
+#include <libgen.h>
+#include <math.h>
+#include <netdb.h>
 #include <time.h>
 #include <unistd.h>
 #include <dbus/dbus-glib.h>
@@ -90,6 +92,73 @@ determine_rtt(CLIENT *clnt) {
 
   return rtt;
 }
+
+
+int
+send_file_pieces(char *pathname, CLIENT *clnt) {
+  struct stat buf;
+  int i, n, ret;
+  FILE *fp;
+  char *bname;
+  enum clnt_stat retval;
+
+  if((pathname == NULL) || (clnt == NULL))
+    return -1;
+
+  memset(&buf, 0, sizeof(struct stat));
+  
+  ret = stat(pathname, &buf);
+  if(ret < 0) {
+    perror("stat");
+    return -1;
+  }
+
+  fp = fopen(pathname, "r");
+  if(fp == NULL) {
+    perror("fopen");
+    return -1;
+  }
+
+  bname = basename(pathname);
+  if(bname == NULL) {
+    perror("basename");
+    return -1;
+  }
+
+  n = (int) ceilf(((float)buf.st_size)/((float)(1024*1024)));
+
+  retval = send_file_1(bname, buf.st_size, &ret, clnt);
+  if(retval != RPC_SUCCESS) {
+    clnt_perror (clnt, "send_partial RPC call failed");
+    return -1;
+  }  
+
+  for(i=0; i<n; i++) {
+    char partial_bytes[1024*1024];
+    data partial_data;
+    int num_bytes;
+
+    num_bytes = fread(partial_bytes, 1, (1024*1024), fp); //1 megabyte
+    if(num_bytes < 0) {
+      perror("fread");
+      return -1;
+    }
+    if(num_bytes == 0)
+      return 0;
+
+    partial_data.data_len = num_bytes;
+    partial_data.data_val = partial_bytes;
+
+    retval = send_partial_1(partial_data, &ret, clnt);
+    if(retval != RPC_SUCCESS) {
+      clnt_perror (clnt, "send_partial RPC call failed");
+      return -1;
+    }
+  }
+
+  return 0;
+}
+	  
 
 int
 main(int argc, char *argv[])

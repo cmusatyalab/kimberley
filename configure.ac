@@ -49,6 +49,8 @@ AC_SEARCH_LIBS([dbus_bus_get],
     [dbus-1],, AC_MSG_FAILURE([cannot find dbus_bus_get function]))
 AC_SEARCH_LIBS([dbus_g_bus_get],
     [dbus-glib-1],, AC_MSG_FAILURE([cannot find dbus_g_bus_get function]))
+AC_SEARCH_LIBS([ceilf],
+    [m],, AC_MSG_FAILURE([cannot find ceilf function]))
 
 # some options and includes
 AC_SUBST(AM_CPPFLAGS, ['-D_REENTRANT -I$(top_srcdir)/common -I$(top_srcdir)/lib/libauth -I$(top_srcdir)/lib/libdconfig -I$(top_srcdir)/lib/libdctl -I$(top_srcdir)/lib/libfilter -I$(top_srcdir)/lib/libfilterexec -I$(top_srcdir)/lib/liblog -I$(top_srcdir)/lib/libodisk -I$(top_srcdir)/lib/libsearchlet -I$(top_srcdir)/lib/libtools -I$(top_srcdir)/lib/transport/socket/common -I$(top_srcdir)/lib/transport/socket/hoststub -I$(top_srcdir)/lib/transport/socket/storagestub'])

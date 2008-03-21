@@ -15,30 +15,38 @@ program MOBILELAUNCHER_PROG {
 
 	int	 load_vm_from_URL(string vm_name<128>, string patch_URL<1024>) = 1;
 	int	 load_vm_from_path(string vm_name<128>, string patch_path<1024>) = 2;
-	int	 load_vm_from_attachment(string vm_name<128>, data patch) = 3;
+	int	 load_vm_from_attachment(string vm_name<128>, string patch_file<1024>) = 3;
+
+
+	/*
+	 * Call to support sending large files through RPC.
+	 */
+
+	int	 send_file(string filename<1024>, int size) = 4;
+	int	 send_partial(data part) = 5;
 
 
 	/*
 	 * Calls to support USB networking.
 	 */
 	
-	void ping(void) = 4;
-	int use_USB_cable(void) = 5;
+	void ping(void) = 6;
+	int use_USB_cable(void) = 7;
 
 
 	/*
 	 * Calls to support floppy disk persistent state.
 	 */
 
-	int  send_persistent_state(data patch) = 6;
-	data retrieve_persistent_state(void) = 7;
+	int  send_persistent_state(data patch) = 8;
+	data retrieve_persistent_state(void) = 9;
 
 
 	/*
 	 * Calls to indicate a change in user status.
 	 */
 
-	void end_usage(int retrieve_state) = 8;
+	void end_usage(int retrieve_state) = 10;
 
   } = 1;
 } = 0x2A2ADEBF;  /* The leading "0x2" is required for "static"

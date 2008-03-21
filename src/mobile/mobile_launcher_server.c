@@ -1,11 +1,12 @@
-#include <stdlib.h>
-#include <stdio.h>
 #include <ctype.h>
-#include <sys/types.h>
-#include <sys/stat.h>
-#include <fcntl.h>
-#include <unistd.h>
 #include <errno.h>
+#include <fcntl.h>
+#include <libgen.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <sys/stat.h>
+#include <sys/types.h>
+#include <unistd.h>
 #include "rpc_mobile_launcher.h"
 #include "display_launcher.h"
 #include "common.h"
@@ -165,11 +166,82 @@ load_vm_from_url_1_svc(char *vm_name, char *patch_URL, int *result,  struct svc_
 
 
 bool_t
-load_vm_from_attachment_1_svc(char *vm_name, data patch_data, int *result,  struct svc_req *rqstp)
+load_vm_from_attachment_1_svc(char *vm_name, char *patch_file, int *result,  struct svc_req *rqstp)
 {
+  char patch_path[PATH_MAX], *bname;
+  
+  if((vm_name == NULL) || (patch_path == NULL) || (result == NULL)) {
+    fprintf(stderr, "(launcher-rpc-server) Bad args to vm_path!\n");
+    if(result)
+      *result = -1;
+    return FALSE;
+  }
 
-  fprintf(stderr, "(launcher-rpc-server) vm_attached not implemented!\n");
+  fprintf(stderr, "(launcher-rpc-server) Preparing new VNC display with "
+	  "vm '%s', attached kimberlize patch '%s'..\n", vm_name, patch_file);
 
+  bname = basename(patch_file);
+  snprintf(patch_path, PATH_MAX, "/tmp/%s", bname);
+  snprintf(command, ARG_MAX, "display_setup -f %s %s", patch_path, vm_name);
+
+  *result = handle_dekimberlize_thread_setup();
+
+  return TRUE;
+}
+
+
+static FILE *attachment = NULL;
+static int attachment_size = 0;
+
+bool_t
+send_file_1_svc(char *filename, int size, int *result, struct svc_req *rqstp)
+{
+  char path[PATH_MAX], *bname;
+
+  bname = basename(filename);
+  snprintf(path, PATH_MAX, "/tmp/%s", basename);
+
+  attachment = fopen(path, "w+");
+  if(attachment == NULL) {
+    perror("fopen");
+    *result = -1;
+    return TRUE;
+  }
+
+  attachment_size = size;
+}
+
+
+bool_t
+send_partial_1_svc(data part, int *result,  struct svc_req *rqstp)
+{
+  int err;
+
+  if((attachment_size <= 0) || (attachment == NULL)) {
+    result = -1;
+    return TRUE;
+  }
+
+  err = fwrite(part.data_val, part.data_len, 1, attachment);
+  if(err <= 0) {
+    perror("fwrite");
+    result = -1;
+    return TRUE;
+  }
+
+  attachment_size -= part.data_len;
+
+  *result = 0;
+
+  if(attachment_size < 0)
+    *result = -1;
+  
+  if(attachment_size <= 0) {
+    fclose(attachment);
+    attachment = NULL;
+    attachment_size = 0;
+  }
+  
   return TRUE;
 }
 
