@@ -55,7 +55,7 @@ main(int argc, char *argv[])
   struct addrinfo *info = NULL, hints;
   enum clnt_stat retval;
   enum vm_type vmt = VM_UNKNOWN;
-  char *path = "", *vm;
+  char *overlay_path = "", *vm, *floppy_path = "";
   
   int connfd = 0; 
   CLIENT *clnt = NULL;
@@ -72,7 +72,7 @@ main(int argc, char *argv[])
   }
   
 
-  while((opt = getopt(argc, argv, "f:i:")) != -1) {
+  while((opt = getopt(argc, argv, "f:i:p:")) != -1) {
 
     switch(opt) {
 
@@ -82,7 +82,7 @@ main(int argc, char *argv[])
 	exit(EXIT_FAILURE);
       }
       vmt = VM_FILE;
-      path = optarg;
+      overlay_path = optarg;
       break;
       
     case 'i':
@@ -91,9 +91,13 @@ main(int argc, char *argv[])
 	exit(EXIT_FAILURE);
       }
       vmt = VM_URL;
-      path = optarg;
+      overlay_path = optarg;
       break;
       
+    case 'p':
+      floppy_path = optarg;
+      break;
+
     default:
       fprintf(stderr, "Bad command-line option.\n");
       exit(EXIT_FAILURE);
@@ -103,8 +107,8 @@ main(int argc, char *argv[])
   vm = argv[optind];
 
   
-  fprintf(stderr, "(mobile-launcher) starting up (vm=%s, path=%s)..\n",
-	  vm, path);
+  fprintf(stderr, "(mobile-launcher) starting up (vm=%s, overlay_path=%s)..\n",
+	  vm, overlay_path);
   
   g_type_init();
   
@@ -197,7 +201,7 @@ main(int argc, char *argv[])
   switch(vmt) {
 
   case VM_FILE:
-    retval = load_vm_from_path_1(vm, path, &err, clnt);
+    retval = load_vm_from_path_1(vm, overlay_path, &err, clnt);
     if (retval != RPC_SUCCESS) {
       fprintf(stderr, "mobile_start: call sending failed: %s", 
 	      clnt_sperrno(retval));
@@ -207,7 +211,7 @@ main(int argc, char *argv[])
     break;
 
   case VM_URL:
-    retval = load_vm_from_url_1(vm, path, &err, clnt);
+    retval = load_vm_from_url_1(vm, overlay_path, &err, clnt);
     if (retval != RPC_SUCCESS) {
       fprintf(stderr, "mobile_start: call sending failed: %s", 
 	      clnt_sperrno(retval));
