@@ -71,7 +71,7 @@ make_tcpip_connection(char *hostname, unsigned short port) {
     return -1;
   }
 
-  bzero(&hints,  sizeof(struct addrinfo));
+  memset(&hints, 0, sizeof(struct addrinfo));
   hints.ai_flags = AI_CANONNAME;
   hints.ai_family = AF_INET;
   hints.ai_socktype = SOCK_STREAM;
@@ -225,7 +225,7 @@ rpc_server_thread(void *arg) {
       pthread_exit((void *)-1);
     }
   
-    bzero(&servaddr, sizeof(struct sockaddr_in));
+    memset(&servaddr, 0, sizeof(struct sockaddr_in));
     servaddr.sin_family = AF_INET;
     servaddr.sin_addr.s_addr = htonl(args->connection_type);
     servaddr.sin_port = htons(args->port);
@@ -291,7 +291,7 @@ setup_rpc_server_with_port(unsigned int prog, unsigned int vers,
     /* Create a thread which becomes a Sun RPC server and
      * wait for it to come up and bind to the port. */
 
-    bzero(&rpc_thread, sizeof(pthread_t));
+    memset(&rpc_thread, 0, sizeof(pthread_t));
     pthread_create(&rpc_thread, NULL, rpc_server_thread, (void *)args);
     
     while(control_ready == 0) 
@@ -347,7 +347,7 @@ setup_rpc_server_and_connection(unsigned int prog, unsigned int vers,
     pthread_exit((void *)-1);
   }
   
-  bzero(&hints,  sizeof(struct addrinfo));
+  memset(&hints, 0, sizeof(struct addrinfo));
   hints.ai_flags = AI_CANONNAME;
   hints.ai_family = AF_INET;
   hints.ai_socktype = SOCK_STREAM;

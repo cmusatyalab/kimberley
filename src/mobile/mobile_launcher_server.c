@@ -40,7 +40,7 @@ handle_dekimberlize_thread_setup() {
   char port_str[MAXPATHLEN];
 
 
-  bzero(&tid, sizeof(pthread_t));
+  memset(&tid, 0, sizeof(pthread_t));
   err = pthread_create(&tid, NULL, launch_display_scripts, NULL);
   if(err != 0) {
     fprintf(stderr, "(launcher-rpc-server) failed creating thread\n");

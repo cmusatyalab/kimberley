@@ -1,5 +1,6 @@
 #include <stdio.h>
 #include <stdlib.h>
+#include <sys/time.h>
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <sys/stat.h>
@@ -7,6 +8,7 @@
 #include <errno.h>
 #include <netdb.h>
 #include <glib.h>
+#include <time.h>
 #include <unistd.h>
 #include <dbus/dbus-glib.h>
 #include <dbus/dbus-glib-bindings.h>
@@ -43,6 +45,52 @@ perform_authentication(void) {
 }
 
 
+/*
+ * Perform a series of pings to determine the round-trip latency of
+ * using the current connection through the DCM.  If this is below
+ * some threshold, the system will prompt the user to optionally use
+ * a USB cable for the thin client connection instead.
+ */
+
+float
+determine_rtt(CLIENT *clnt) {
+  float rtt = 0;
+  enum clnt_stat retval;
+  struct timeval tv_before, tv_after;
+  int ret, i;
+
+  for(i=0; i<10; i++) {  //perform 10 RPC pings
+
+    memset(&tv_before, 0, sizeof(struct timeval));
+    memset(&tv_after, 0, sizeof(struct timeval));
+  
+    ret = gettimeofday(&tv_before, NULL);
+    if(ret < 0) {
+      perror("gettimeofday");
+      return (float) -1;
+    }
+    
+    retval = ping_1((void *)NULL, clnt);
+    if(retval == FALSE) {
+      fprintf(stderr, "(mobile-launcher) ping failed!\n");
+      return (float) -1;
+    }
+    
+    ret = gettimeofday(&tv_after, NULL);
+    if(ret < 0) {
+      perror("gettimeofday");
+      return (float) -1;
+    }
+
+    rtt += (tv_after.tv_sec - tv_before.tv_sec)*1000;
+    rtt += ((double)(tv_after.tv_usec - tv_before.tv_usec))/1000;
+  }
+
+  rtt /= 10;  //average over 10 runs
+
+  return rtt;
+}
+
 int
 main(int argc, char *argv[])
 {
@@ -51,6 +99,7 @@ main(int argc, char *argv[])
   GError *gerr = NULL;
   guint gport_rpc = 0, gport_vnc = 0;
   int err, ret = EXIT_SUCCESS, opt;
+  int use_USB = 0;
   char port_str[NI_MAXSERV];
   struct addrinfo *info = NULL, hints;
   enum clnt_stat retval;
@@ -72,6 +121,8 @@ main(int argc, char *argv[])
   }
   
 
+  fprintf(stderr, "(mobile-launcher) starting up..\n");
+  
   while((opt = getopt(argc, argv, "f:i:p:")) != -1) {
 
     switch(opt) {
@@ -83,6 +134,7 @@ main(int argc, char *argv[])
       }
       vmt = VM_FILE;
       overlay_path = optarg;
+      fprintf(stderr, "\toverlay file:%s\n", overlay_path);
       break;
       
     case 'i':
@@ -92,10 +144,12 @@ main(int argc, char *argv[])
       }
       vmt = VM_URL;
       overlay_path = optarg;
+      fprintf(stderr, "\toverlay URL:%s\n", overlay_path);
       break;
       
     case 'p':
       floppy_path = optarg;
+      fprintf(stderr, "\tfloppy disk path:%s\n", floppy_path);
       break;
 
     default:
@@ -106,9 +160,6 @@ main(int argc, char *argv[])
 
   vm = argv[optind];
 
-  
-  fprintf(stderr, "(mobile-launcher) starting up (vm=%s, overlay_path=%s)..\n",
-	  vm, overlay_path);
   
   g_type_init();
   
@@ -165,7 +216,7 @@ main(int argc, char *argv[])
     goto cleanup;
   }
     
-  bzero(&hints,  sizeof(struct addrinfo));
+  memset(&hints, 0, sizeof(struct addrinfo));
   hints.ai_flags = AI_CANONNAME;
   hints.ai_family = AF_INET;
   hints.ai_socktype = SOCK_STREAM;
@@ -197,6 +248,10 @@ main(int argc, char *argv[])
   }
 
   perform_authentication();
+
+  if(determine_rtt(clnt) > 1000) {
+    //use_USB = ask_user_for_USB();
+  }
 
   switch(vmt) {
 
