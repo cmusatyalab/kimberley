@@ -197,7 +197,7 @@ main(int argc, char *argv[])
   switch(vmt) {
 
   case VM_FILE:
-    retval = mobile_vm_path_1(vm, path, &err, clnt);
+    retval = load_vm_from_path_1(vm, path, &err, clnt);
     if (retval != RPC_SUCCESS) {
       fprintf(stderr, "mobile_start: call sending failed: %s", 
 	      clnt_sperrno(retval));
@@ -207,7 +207,7 @@ main(int argc, char *argv[])
     break;
 
   case VM_URL:
-    retval = mobile_vm_url_1(vm, path, &err, clnt);
+    retval = load_vm_from_url_1(vm, path, &err, clnt);
     if (retval != RPC_SUCCESS) {
       fprintf(stderr, "mobile_start: call sending failed: %s", 
 	      clnt_sperrno(retval));
@@ -249,7 +249,7 @@ main(int argc, char *argv[])
   
  cleanup:
   if(clnt != NULL)
-    mobile_finished_1((void *)NULL, clnt); // signal display
+    end_usage_1(0, (void *)NULL, clnt); // signal display
   
 
   if(gerr) g_error_free (gerr);

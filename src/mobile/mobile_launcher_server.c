@@ -120,7 +120,7 @@ handle_dekimberlize_thread_setup() {
 
 
 bool_t
-mobile_vm_path_1_svc(char *vm_name, char *patch_path, int *result, struct svc_req *rqstp)
+load_vm_from_path_1_svc(char *vm_name, char *patch_path, int *result, struct svc_req *rqstp)
 {
   
   if((vm_name == NULL) || (patch_path == NULL) || (result == NULL)) {
@@ -142,7 +142,7 @@ mobile_vm_path_1_svc(char *vm_name, char *patch_path, int *result, struct svc_re
 
 
 bool_t
-mobile_vm_url_1_svc(char *vm_name, char *patch_URL, int *result,  struct svc_req *rqstp)
+load_vm_from_url_1_svc(char *vm_name, char *patch_URL, int *result,  struct svc_req *rqstp)
 {
     
   if((vm_name == NULL) || (patch_URL == NULL) || (result == NULL)) {
@@ -165,7 +165,7 @@ mobile_vm_url_1_svc(char *vm_name, char *patch_URL, int *result,  struct svc_req
 
 
 bool_t
-mobile_vm_attached_1_svc(char *vm_name, data patch_data, int *result,  struct svc_req *rqstp)
+load_vm_from_attachment_1_svc(char *vm_name, data patch_data, int *result,  struct svc_req *rqstp)
 {
 
   fprintf(stderr, "(launcher-rpc-server) vm_attached not implemented!\n");
@@ -173,14 +173,41 @@ mobile_vm_attached_1_svc(char *vm_name, data patch_data, int *result,  struct sv
   return TRUE;
 }
 
+
 bool_t
-mobile_finished_1_svc(void *result, struct svc_req *rqstp)
+end_usage_1_svc(int retrieve_state, void *result,  struct svc_req *rqstp)
 {
   int fd;
 
   fd = open("/tmp/dekimberlize_finished", O_RDWR|O_CREAT);
   close(fd);
   
+  return TRUE;
+}
+
+
+bool_t
+ping_1_svc(void *result, struct svc_req *rqstp)
+{
+  return TRUE;
+}
+
+
+bool_t
+use_usb_cable_1_svc(int *result, struct svc_req *rqstp)
+{
+  return TRUE;
+}
+
+bool_t
+send_persistent_state_1_svc(data patch, int *result,  struct svc_req *rqstp)
+{
+  return TRUE;
+}
+
+bool_t
+retrieve_persistent_state_1_svc(data *result, struct svc_req *rqstp)
+{
   return TRUE;
 }
 

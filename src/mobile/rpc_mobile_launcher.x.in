@@ -1,14 +1,7 @@
 /*
- *  The OpenDiamond Platform for Interactive Search
- *  Version 3
- *
- *  Copyright (c) 2008 Carnegie Mellon University
- *  All rights reserved.
- *
- *  This software is distributed under the terms of the Eclipse Public
- *  License, Version 1.0 which can be found in the file named LICENSE.
- *  ANY USE, REPRODUCTION OR DISTRIBUTION OF THIS SOFTWARE CONSTITUTES
- *  RECIPIENT'S ACCEPTANCE OF THIS AGREEMENT
+ * SunRPC method calls between two devices using the Kimberley system.
+ * The server is generally assumed to be a large display, and the client
+ * is assumed to be mobile device.
  */
 
 typedef opaque data<>;
@@ -16,12 +9,36 @@ typedef opaque data<>;
 program MOBILELAUNCHER_PROG {
   version MOBILELAUNCHER_VERS {
 
-    /* Mobile client <=> Mobile launcher calls. */
+	/*
+	 * Calls to transfer the VM overlay.
+	 */
 
-	int	mobile_vm_URL(string vm_name<128>, string patch_URL<1024>) = 1;
-	int	mobile_vm_path(string vm_name<128>, string patch_path<1024>) = 2;
-	int	mobile_vm_attached(string vm_name<128>, data patch_data) = 3;
-	void	mobile_finished(void) = 4;
+	int	 load_vm_from_URL(string vm_name<128>, string patch_URL<1024>) = 1;
+	int	 load_vm_from_path(string vm_name<128>, string patch_path<1024>) = 2;
+	int	 load_vm_from_attachment(string vm_name<128>, data patch) = 3;
+
+
+	/*
+	 * Calls to support USB networking.
+	 */
+	
+	void ping(void) = 4;
+	int use_USB_cable(void) = 5;
+
+
+	/*
+	 * Calls to support floppy disk persistent state.
+	 */
+
+	int  send_persistent_state(data patch) = 6;
+	data retrieve_persistent_state(void) = 7;
+
+
+	/*
+	 * Calls to indicate a change in user status.
+	 */
+
+	void end_usage(int retrieve_state) = 8;
 
   } = 1;
 } = 0x2A2ADEBF;  /* The leading "0x2" is required for "static"
