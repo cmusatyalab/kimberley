@@ -19,7 +19,8 @@ void *
 launch_display_scripts(void *arg) {
   int err;
 
-  fprintf(stderr, "(launcher-rpc-server) executing display scripts..\n");
+  fprintf(stderr, "(launcher-rpc-server) Executing display script: %s\n",
+	  command);
 
   err = system(command);
   if(err < 0) {
@@ -27,7 +28,7 @@ launch_display_scripts(void *arg) {
     pthread_exit((void *)-1);
   }
   
-  fprintf(stderr, "(launcher-rpc-server) display scripts completed.\n");
+  fprintf(stderr, "(launcher-rpc-server) Display scripts completed.\n");
 
   pthread_exit((void *)0);
 }
@@ -319,6 +320,9 @@ use_persistent_state_1_svc(char *filename, int *result,  struct svc_req *rqstp)
   copy = strdup(filename);
   bname = basename(copy);
   snprintf(persistent_state_filename, PATH_MAX, "/tmp/%s", bname);
+
+  fprintf(stderr, "(display-launcher) Using persistent state file '%s'\n",
+	  persistent_state_filename);
 
   free(copy);
   *result = 0;

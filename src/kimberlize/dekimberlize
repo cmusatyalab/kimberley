@@ -148,7 +148,7 @@ echo
 echo "Resuming VM '$1'.."
 VBoxManage startvm $1 > /dev/null
 if [ $? -ne 0 ]; then
-	echo `basename $0`: error: failed resuming VM
+    echo `basename $0`: error: failed resuming VM
     failure 
 fi
 
@@ -158,13 +158,16 @@ fi
 #
 
 if [ $floppy_file != "" ]; then
-	sleep 20s
-	echo
-	echo "Attaching floppy disk '$floppy_file' to VM.."
-	VBoxManage controlvm $1 floppyattach $floppy_file
-	if [ $? -ne 0 ]; then
+    sleep 20s
+    echo
+    echo "Attaching floppy disk '$floppy_file' to VM.."
+    VBoxManage controlvm $1 floppyattach $floppy_file
+    if [ $? -ne 0 ]; then
     	echo `basename $0`: error: failed attaching floppy disk 
-	fi
+    fi
+else
+    echo
+    echo "Not attaching floppy disk to VM.."
 fi
 
 
