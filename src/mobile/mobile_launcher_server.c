@@ -190,13 +190,21 @@ load_vm_from_attachment_1_svc(char *vm_name, char *patch_file, int *result,  str
 }
 
 
+static char files[2][PATH_MAX];
+static char num_files = 0;
+
 static FILE *attachment = NULL;
 static int attachment_size = 0;
 
 bool_t
 send_file_1_svc(char *filename, int size, int *result, struct svc_req *rqstp)
 {
-  char path[PATH_MAX], *bname;
+  char *bname;
+
+  if(num_files >= 2) {
+    *result = -1;
+    return TRUE;
+  }
 
   fprintf(stderr, "(display-launcher) Receiving file '%s' of size %d..\n", 
 	  filename, size);
@@ -205,17 +213,18 @@ send_file_1_svc(char *filename, int size, int *result, struct svc_req *rqstp)
 
   bname = strdup(filename);
   bname = basename(bname);
-  snprintf(path, PATH_MAX, "/tmp/%s", bname);
+  snprintf(files[num_files], PATH_MAX, "/tmp/%s", bname);
 
-  fprintf(stderr, "(display-launcher) Writing file '%s'\n", path);
+  fprintf(stderr, "(display-launcher) Writing file '%s'\n", files[num_files]);
 
-  attachment = fopen(path, "w+");
+  attachment = fopen(files[num_files], "w+");
   if(attachment == NULL) {
     perror("fopen");
     *result = -1;
     return TRUE;
   }
 
+  num_files++;
 
   free(bname);
   *result = 0;
@@ -265,10 +274,13 @@ send_partial_1_svc(data part, int *result,  struct svc_req *rqstp)
 bool_t
 end_usage_1_svc(int retrieve_state, void *result,  struct svc_req *rqstp)
 {
-  int fd;
+  int fd, i;
 
   fd = open("/tmp/dekimberlize_finished", O_RDWR|O_CREAT);
   close(fd);
+
+  for(i=0; i<num_files; i++)
+    remove(files[i]);
   
   return TRUE;
 }
