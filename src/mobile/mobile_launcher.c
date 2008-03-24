@@ -97,39 +97,41 @@ determine_rtt(CLIENT *clnt) {
 
 #define CHUNK_SIZE 1048576
 int
-send_file_in_pieces(char *pathname, CLIENT *clnt) {
+send_file_in_pieces(char *path, CLIENT *clnt) {
   struct stat buf;
   int i, n, ret;
   FILE *fp;
-  char *bname;
+  char *bname, *pathname;
   enum clnt_stat retval;
 
-  if((pathname == NULL) || (clnt == NULL))
+  if((path == NULL) || (clnt == NULL))
     return -1;
 
   memset(&buf, 0, sizeof(struct stat));
   
-  ret = stat(pathname, &buf);
+  ret = stat(path, &buf);
   if(ret < 0) {
     perror("stat");
     return -1;
   }
 
-  fp = fopen(pathname, "r");
+  fp = fopen(path, "r");
   if(fp == NULL) {
     perror("fopen");
     return -1;
   }
 
+  pathname = strdup(path);
   bname = basename(pathname);
   if(bname == NULL) {
     perror("basename");
     return -1;
   }
+  fprintf(stderr, "(mobile-launcher) Basename of file path: %s\n", bname);
 
   n = (int) ceilf(((float)buf.st_size)/((float)CHUNK_SIZE));
-  printf(stderr, "(mobile-launcher) Transfer of %s (size=%d) will take %d"
-	 " RPCs.\n", pathname, buf.st_size, n);
+  fprintf(stderr, "(mobile-launcher) Transfer of %s (size=%d) will take %d"
+	  " RPCs.\n", pathname, (int) buf.st_size, n);
 
   retval = send_file_1(bname, buf.st_size, &ret, clnt);
   if(retval != RPC_SUCCESS) {
@@ -161,6 +163,8 @@ send_file_in_pieces(char *pathname, CLIENT *clnt) {
 
     fprintf(stderr, ".");
   }
+
+  free(pathname);
 
   return 0;
 }

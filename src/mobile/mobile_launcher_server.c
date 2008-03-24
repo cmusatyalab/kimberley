@@ -198,8 +198,14 @@ send_file_1_svc(char *filename, int size, int *result, struct svc_req *rqstp)
 {
   char path[PATH_MAX], *bname;
 
-  bname = basename(filename);
-  snprintf(path, PATH_MAX, "/tmp/%s", basename);
+  fprintf(stderr, "(display-launcher) Receiving file '%s' of size %d..\n", 
+	  filename, size);
+
+  attachment_size = size;
+
+  bname = strdup(filename);
+  bname = basename(bname);
+  snprintf(path, PATH_MAX, "/tmp/%s", bname);
 
   fprintf(stderr, "(display-launcher) Writing file '%s'\n", path);
 
@@ -210,7 +216,11 @@ send_file_1_svc(char *filename, int size, int *result, struct svc_req *rqstp)
     return TRUE;
   }
 
-  attachment_size = size;
+
+  free(bname);
+  *result = 0;
+
+  return TRUE;
 }
 
 
@@ -232,8 +242,7 @@ send_partial_1_svc(data part, int *result,  struct svc_req *rqstp)
   }
 
   attachment_size -= part.data_len;
-  fprintf(stderr, "(display-launcher) Wrote %d bytes to file.\n", 
-	  part.data_len);
+  fprintf(stderr, ".");
 
   *result = 0;
 
