@@ -74,7 +74,7 @@ determine_rtt(CLIENT *clnt) {
 
     fprintf(stderr, "Ping!\n");
     retval = ping_1((void *)NULL, clnt);
-    if(retval == FALSE) {
+    if(retval != RPC_SUCCESS) {
       fprintf(stderr, "(mobile-launcher) ping failed!\n");
       return (float) -1;
     }
@@ -90,6 +90,7 @@ determine_rtt(CLIENT *clnt) {
   }
 
   rtt /= 10;  //average over 10 runs
+  fprintf(stderr, "(mobile-launcher) Average ping time: %f ms\n", rtt);
 
   return rtt;
 }
