@@ -95,7 +95,7 @@ determine_rtt(CLIENT *clnt) {
   return rtt;
 }
 
-#define CHUNK_SIZE 10485760
+#define CHUNK_SIZE 1048576
 int
 send_file_in_pieces(char *pathname, CLIENT *clnt) {
   struct stat buf;
