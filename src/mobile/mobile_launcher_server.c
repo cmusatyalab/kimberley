@@ -201,6 +201,8 @@ send_file_1_svc(char *filename, int size, int *result, struct svc_req *rqstp)
   bname = basename(filename);
   snprintf(path, PATH_MAX, "/tmp/%s", basename);
 
+  fprintf(stderr, "(display-launcher) Writing file '%s'\n", path);
+
   attachment = fopen(path, "w+");
   if(attachment == NULL) {
     perror("fopen");
@@ -230,6 +232,8 @@ send_partial_1_svc(data part, int *result,  struct svc_req *rqstp)
   }
 
   attachment_size -= part.data_len;
+  fprintf(stderr, "(display-launcher) Wrote %d bytes to file.\n", 
+	  part.data_len);
 
   *result = 0;
 
@@ -238,6 +242,9 @@ send_partial_1_svc(data part, int *result,  struct svc_req *rqstp)
   
   if(attachment_size <= 0) {
     fclose(attachment);
+
+    fprintf(stderr, "(display-launcher) File transfer complete!\n");
+
     attachment = NULL;
     attachment_size = 0;
   }
@@ -261,6 +268,7 @@ end_usage_1_svc(int retrieve_state, void *result,  struct svc_req *rqstp)
 bool_t
 ping_1_svc(void *result, struct svc_req *rqstp)
 {
+  fprintf(stderr, "Pong!\n");
   return TRUE;
 }
 

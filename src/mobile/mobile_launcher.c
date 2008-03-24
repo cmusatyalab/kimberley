@@ -71,7 +71,8 @@ determine_rtt(CLIENT *clnt) {
       perror("gettimeofday");
       return (float) -1;
     }
-    
+
+    fprintf(stderr, "Ping!\n");
     retval = ping_1((void *)NULL, clnt);
     if(retval == FALSE) {
       fprintf(stderr, "(mobile-launcher) ping failed!\n");
@@ -93,7 +94,7 @@ determine_rtt(CLIENT *clnt) {
   return rtt;
 }
 
-
+#define CHUNK_SIZE 10485760
 int
 send_file_in_pieces(char *pathname, CLIENT *clnt) {
   struct stat buf;
@@ -125,7 +126,9 @@ send_file_in_pieces(char *pathname, CLIENT *clnt) {
     return -1;
   }
 
-  n = (int) ceilf(((float)buf.st_size)/((float)(1024*1024)));
+  n = (int) ceilf(((float)buf.st_size)/((float)CHUNK_SIZE));
+  printf(stderr, "(mobile-launcher) Transfer of %s (size=%d) will take %d"
+	 " RPCs.\n", pathname, buf.st_size, n);
 
   retval = send_file_1(bname, buf.st_size, &ret, clnt);
   if(retval != RPC_SUCCESS) {
@@ -134,11 +137,11 @@ send_file_in_pieces(char *pathname, CLIENT *clnt) {
   }  
 
   for(i=0; i<n; i++) {
-    char partial_bytes[1024*1024];
+    char partial_bytes[CHUNK_SIZE];
     data partial_data;
     int num_bytes;
 
-    num_bytes = fread(partial_bytes, 1, (1024*1024), fp); //1 megabyte
+    num_bytes = fread(partial_bytes, 1, CHUNK_SIZE, fp); //1 megabyte
     if(num_bytes < 0) {
       perror("fread");
       return -1;
@@ -331,11 +334,11 @@ main(int argc, char *argv[])
   }
 
 
-  fprintf(stderr, "(mobile-launcher) Sending floppy disk image..\n");
-  if(floppy_path != NULL)
+  if(floppy_path != NULL) {
+    fprintf(stderr, "(mobile-launcher) Sending floppy disk image..\n");
     if(send_file_in_pieces(floppy_path, clnt) < 0)  //not a total failure case
       fprintf(stderr, "(mobile-launcher) failed sending floppy disk image\n");
-
+  }
 
   switch(vmt) {
 
@@ -391,7 +394,7 @@ main(int argc, char *argv[])
 
   fprintf(stderr, "(mobile-launcher) executing vncviwer..\n");
 
-  snprintf(command, ARG_MAX, "vncviewer --hostname localhost:%u", gport_vnc);
+  snprintf(command, ARG_MAX, "vncviewer localhost::%u", gport_vnc);
   err = system(command);
   if(err < 0) {
     perror("system");

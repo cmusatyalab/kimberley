@@ -183,7 +183,7 @@ local_tunnel(int sock1, int sock2) {
       continue;
     }
     
-    fprintf(stderr, "(launcher-tunnel) tunneled %d bytes %s\n", size_in, dir);
+    //    fprintf(stderr, "(launcher-tunnel) tunneled %d bytes %s\n", size_in, dir);
   }
 
   /* Should never get here. */ 
