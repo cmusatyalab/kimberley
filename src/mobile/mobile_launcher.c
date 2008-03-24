@@ -180,7 +180,7 @@ main(int argc, char *argv[])
   int connfd = 0; 
   CLIENT *clnt = NULL;
 
-  if(argc != 4) {
+  if(argc < 4) {
     usage(argv[0]);
     ret = EXIT_FAILURE;
     goto cleanup;
@@ -194,7 +194,7 @@ main(int argc, char *argv[])
 
   fprintf(stderr, "(mobile-launcher) starting up..\n");
   
-  while((opt = getopt(argc, argv, "f:i:p:")) != -1) {
+  while((opt = getopt(argc, argv, "f:i:d:")) != -1) {
 
     switch(opt) {
 
@@ -224,7 +224,7 @@ main(int argc, char *argv[])
       break;
 
     default:
-      fprintf(stderr, "Bad command-line option.\n");
+      usage(argv[0]);
       exit(EXIT_FAILURE);
     }
   }
