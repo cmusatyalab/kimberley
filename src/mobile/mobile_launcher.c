@@ -28,8 +28,8 @@ enum vm_type {
 
 void
 usage(char *argv0) {
-  fprintf(stderr, "%s <[-f file] || [-i URL]> <vm-name>\n", 
-	  argv0);
+  fprintf(stderr, "%s [-d floppy-file] <[-f patch-file] || [-i URL]> "
+	  "<vm-name>\n", argv0);
 }
 
 
@@ -95,7 +95,7 @@ determine_rtt(CLIENT *clnt) {
 
 
 int
-send_file_pieces(char *pathname, CLIENT *clnt) {
+send_file_in_pieces(char *pathname, CLIENT *clnt) {
   struct stat buf;
   int i, n, ret;
   FILE *fp;
@@ -154,6 +154,8 @@ send_file_pieces(char *pathname, CLIENT *clnt) {
       clnt_perror (clnt, "send_partial RPC call failed");
       return -1;
     }
+
+    fprintf(stderr, ".");
   }
 
   return 0;
@@ -216,7 +218,7 @@ main(int argc, char *argv[])
       fprintf(stderr, "\toverlay URL:%s\n", overlay_path);
       break;
       
-    case 'p':
+    case 'd':
       floppy_path = optarg;
       fprintf(stderr, "\tfloppy disk path:%s\n", floppy_path);
       break;
@@ -316,18 +318,39 @@ main(int argc, char *argv[])
     goto cleanup;
   }
 
+
   perform_authentication();
 
+
   if(determine_rtt(clnt) > 1000) {
+    fprintf(stderr, "(mobile-launcher) Connection is slower than 1000ms\n");
     //use_USB = ask_user_for_USB();
   }
+  else {
+    fprintf(stderr, "(mobile-launcher) Connection is faster than 1000ms\n");
+  }
+
+
+  fprintf(stderr, "(mobile-launcher) Sending floppy disk image..\n");
+  if(floppy_path != NULL)
+    if(send_file_in_pieces(floppy_path, clnt) < 0)  //not a total failure case
+      fprintf(stderr, "(mobile-launcher) failed sending floppy disk image\n");
+
 
   switch(vmt) {
 
   case VM_FILE:
-    retval = load_vm_from_path_1(vm, overlay_path, &err, clnt);
+    fprintf(stderr, "(mobile-launcher) Sending VM overlay..\n");
+    if(send_file_in_pieces(overlay_path, clnt) < 0) {
+      fprintf(stderr, "(mobile-launcher) failed sending VM overlay!\n");
+      ret = EXIT_FAILURE;
+      goto cleanup;
+    }
+
+    fprintf(stderr, "(mobile-launcher) Loading VM..\n");
+    retval = load_vm_from_attachment_1(vm, overlay_path, &err, clnt);
     if (retval != RPC_SUCCESS) {
-      fprintf(stderr, "mobile_start: call sending failed: %s", 
+      fprintf(stderr, "(mobile-launcher) load VM from attachment failed: %s", 
 	      clnt_sperrno(retval));
       ret = EXIT_FAILURE;
       goto cleanup;
@@ -335,9 +358,10 @@ main(int argc, char *argv[])
     break;
 
   case VM_URL:
+    fprintf(stderr, "(mobile-launcher) Loading VM..\n");
     retval = load_vm_from_url_1(vm, overlay_path, &err, clnt);
     if (retval != RPC_SUCCESS) {
-      fprintf(stderr, "mobile_start: call sending failed: %s", 
+      fprintf(stderr, "(mobile-launcher) load VM from URL failed: %s", 
 	      clnt_sperrno(retval));
       ret = EXIT_FAILURE;
       goto cleanup;
@@ -349,7 +373,7 @@ main(int argc, char *argv[])
     goto cleanup;
   }
 
-  fprintf(stderr, "(mobile-launcher) DBus calling into dcm for VNC conn..\n");
+  fprintf(stderr, "(mobile-launcher) DBus calling into DCM for VNC conn..\n");
 
   /* Signal DCM that you would like it to search for a VNC service. */
   if(!edu_cmu_cs_diamond_opendiamond_dcm_client(dbus_proxy, 
