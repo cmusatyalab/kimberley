@@ -25,7 +25,7 @@ sleep 5s
 # Begin running dekimberlize in this new VM asap to load application
 #
 
-DISPLAY=:0.0 dekimberlize $1 $2 $3
+DISPLAY=:0.0 dekimberlize $@
 
 
 ########################################################################

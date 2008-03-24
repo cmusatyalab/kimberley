@@ -13,7 +13,7 @@
 
 
 static char command[ARG_MAX];
-
+static char persistent_state_filename[PATH_MAX];
 
 void *
 launch_display_scripts(void *arg) {
@@ -168,7 +168,7 @@ load_vm_from_url_1_svc(char *vm_name, char *patch_URL, int *result,  struct svc_
 bool_t
 load_vm_from_attachment_1_svc(char *vm_name, char *patch_file, int *result,  struct svc_req *rqstp)
 {
-  char patch_path[PATH_MAX], *bname;
+  char patch_path[PATH_MAX], *bname, *copy;
   
   if((vm_name == NULL) || (patch_path == NULL) || (result == NULL)) {
     fprintf(stderr, "(launcher-rpc-server) Bad args to vm_path!\n");
@@ -180,9 +180,17 @@ load_vm_from_attachment_1_svc(char *vm_name, char *patch_file, int *result,  str
   fprintf(stderr, "(launcher-rpc-server) Preparing new VNC display with "
 	  "vm '%s', attached kimberlize patch '%s'..\n", vm_name, patch_file);
 
-  bname = basename(patch_file);
+  copy = strdup(patch_file);
+  bname = basename(copy);
   snprintf(patch_path, PATH_MAX, "/tmp/%s", bname);
-  snprintf(command, ARG_MAX, "display_setup -f %s %s", patch_path, vm_name);
+
+  if(strlen(persistent_state_filename) > 0)
+    snprintf(command, ARG_MAX, "display_setup -d %s -f %s %s",
+	     persistent_state_filename, patch_path, vm_name);
+  else
+    snprintf(command, ARG_MAX, "display_setup -f %s %s", patch_path, vm_name);
+
+  free(copy);
 
   *result = handle_dekimberlize_thread_setup();
 
@@ -199,7 +207,7 @@ static int attachment_size = 0;
 bool_t
 send_file_1_svc(char *filename, int size, int *result, struct svc_req *rqstp)
 {
-  char *bname;
+  char *bname, *copy;
 
   if(num_files >= 2) {
     *result = -1;
@@ -211,8 +219,8 @@ send_file_1_svc(char *filename, int size, int *result, struct svc_req *rqstp)
 
   attachment_size = size;
 
-  bname = strdup(filename);
-  bname = basename(bname);
+  copy = strdup(filename);
+  bname = basename(copy);
   snprintf(files[num_files], PATH_MAX, "/tmp/%s", bname);
 
   fprintf(stderr, "(display-launcher) Writing file '%s'\n", files[num_files]);
@@ -226,7 +234,7 @@ send_file_1_svc(char *filename, int size, int *result, struct svc_req *rqstp)
 
   num_files++;
 
-  free(bname);
+  free(copy);
   *result = 0;
 
   return TRUE;
@@ -282,6 +290,9 @@ end_usage_1_svc(int retrieve_state, void *result,  struct svc_req *rqstp)
   for(i=0; i<num_files; i++)
     remove(files[i]);
   
+  persistent_state_filename[0]='\0';
+  num_files = 0;
+
   return TRUE;
 }
 
@@ -301,8 +312,17 @@ use_usb_cable_1_svc(int *result, struct svc_req *rqstp)
 }
 
 bool_t
-send_persistent_state_1_svc(data patch, int *result,  struct svc_req *rqstp)
+use_persistent_state_1_svc(char *filename, int *result,  struct svc_req *rqstp)
 {
+  char *bname, *copy;
+
+  copy = strdup(filename);
+  bname = basename(copy);
+  snprintf(persistent_state_filename, PATH_MAX, "/tmp/%s", bname);
+
+  free(copy);
+  *result = 0;
+
   return TRUE;
 }
 

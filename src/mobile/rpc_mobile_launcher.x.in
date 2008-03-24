@@ -38,7 +38,7 @@ program MOBILELAUNCHER_PROG {
 	 * Calls to support floppy disk persistent state.
 	 */
 
-	int  send_persistent_state(data patch) = 8;
+	int  use_persistent_state(string filename<1024>) = 8;
 	data retrieve_persistent_state(void) = 9;
 
 
