@@ -341,6 +341,15 @@ main(int argc, char *argv[])
 
   if(floppy_path != NULL) {
     fprintf(stderr, "(mobile-launcher) Sending floppy disk image..\n");
+
+    retval = use_persistent_state_1(floppy_path, &err, clnt);
+    if (retval != RPC_SUCCESS) {
+      fprintf(stderr, "(mobile-launcher) setting persistent state file "
+	      "failed: %s", clnt_sperrno(retval));
+      ret = EXIT_FAILURE;
+      goto cleanup;
+    }
+
     if(send_file_in_pieces(floppy_path, clnt) < 0)  //not a total failure case
       fprintf(stderr, "(mobile-launcher) failed sending floppy disk image\n");
   }
