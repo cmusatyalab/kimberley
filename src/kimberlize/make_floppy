@@ -1,0 +1,45 @@
+#!/bin/bash
+
+output_file="/tmp/floppy"
+size=102400
+
+usage()
+{
+        echo "usage: `basename $0` [-o file] [-s size-in-MB]"
+}
+
+
+while getopts ":o:s:h" Option
+do
+    case $Option in
+        o)
+            output_file=$OPTARG
+            echo "Outputting floppy to file '$output_file'.."
+            ;;
+        s)
+            size=$OPTARG
+            declare -i size
+            echo "Creating floppy of size $size MB.."
+            size=`echo "scale=1; 1024*$size" | bc`
+            ;;
+        h)
+            usage
+            exit 0
+            ;;
+        ?)
+            usage
+            exit 1
+            ;;
+    esac
+done
+shift $(($OPTIND-1))
+
+
+########################################################################
+# Create a new floppy disk image (FAT32)
+#
+
+mkdosfs -C -F 32 $output_file $size
+
+
+exit 0
