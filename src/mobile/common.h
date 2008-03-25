@@ -8,6 +8,15 @@
 #define LAUNCHER_DCM_SERVICE_NAME	"_launcher_dcm._tcp"
 #define VNC_DCM_SERVICE_NAME		"_vnc_dcm._tcp"
 
+
+/*
+ * The chunk size is 1 megabyte for sending chunks of files between
+ * client and server.
+ */
+
+#define CHUNK_SIZE 1048576
+
+
 CLIENT *       rpc_init(int connfd, unsigned int prog, unsigned int vers);
 
 unsigned short choose_random_port(void);

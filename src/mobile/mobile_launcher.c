@@ -95,13 +95,12 @@ determine_rtt(CLIENT *clnt) {
   return rtt;
 }
 
-#define CHUNK_SIZE 1048576
+
 int
 send_file_in_pieces(char *path, CLIENT *clnt) {
   struct stat buf;
   int i, n, ret;
   FILE *fp;
-  char *bname, *pathname;
   enum clnt_stat retval;
 
   if((path == NULL) || (clnt == NULL))
@@ -121,21 +120,13 @@ send_file_in_pieces(char *path, CLIENT *clnt) {
     return -1;
   }
 
-  pathname = strdup(path);
-  bname = basename(pathname);
-  if(bname == NULL) {
-    perror("basename");
-    return -1;
-  }
-  fprintf(stderr, "(mobile-launcher) Basename of file path: %s\n", bname);
-
   n = (int) ceilf(((float)buf.st_size)/((float)CHUNK_SIZE));
   fprintf(stderr, "(mobile-launcher) Transfer of %s (size=%d) will take %d"
-	  " RPCs.\n", pathname, (int) buf.st_size, n);
+	  " RPCs.\n", path, (int) buf.st_size, n);
 
-  retval = send_file_1(bname, buf.st_size, &ret, clnt);
+  retval = send_file_1(path, buf.st_size, &ret, clnt);
   if(retval != RPC_SUCCESS) {
-    clnt_perror (clnt, "send_partial RPC call failed");
+    clnt_perror (clnt, "send_file RPC call failed");
     return -1;
   }  
 
@@ -144,7 +135,7 @@ send_file_in_pieces(char *path, CLIENT *clnt) {
     data partial_data;
     int num_bytes;
 
-    num_bytes = fread(partial_bytes, 1, CHUNK_SIZE, fp); //1 megabyte
+    num_bytes = fread(partial_bytes, 1, CHUNK_SIZE, fp);
     if(num_bytes < 0) {
       perror("fread");
       return -1;
@@ -164,7 +155,58 @@ send_file_in_pieces(char *path, CLIENT *clnt) {
     fprintf(stderr, ".");
   }
 
-  free(pathname);
+  return 0;
+}
+
+
+int
+retrieve_file_in_pieces(char *path, CLIENT *clnt) {
+  int i, n, ret, size=0;
+  FILE *fp;
+  enum clnt_stat retval;
+
+  if((path == NULL) || (clnt == NULL))
+    return -1;
+
+  fp = fopen(path, "w+");
+  if(fp == NULL) {
+    perror("fopen");
+    return -1;
+  }
+
+  fprintf(stderr, "(mobile-launcher) Retrieving file to path: %s\n", path);
+  retval = retrieve_file_1(path, &size, clnt);
+  if(retval != RPC_SUCCESS) {
+    clnt_perror (clnt, "retrieve_file RPC call failed");
+    return -1;
+  }
+
+  n = (int) ceilf(((float)size)/((float)CHUNK_SIZE));
+  fprintf(stderr, "(mobile-launcher) Transfer of %s (size=%d) will take %d"
+	  " RPCs.\n", path, (int) size, n);
+
+  for(i=0; i<n; i++) {
+    data partial_data;
+    int num_bytes;
+
+    memset(&partial_data, 0, sizeof(data));
+
+    retval = retrieve_partial_1(&partial_data, clnt);
+    if(retval != RPC_SUCCESS) {
+      clnt_perror (clnt, "retrieve_partial RPC call failed");
+      return -1;
+    }
+
+    num_bytes = fwrite(partial_data.data_val, 1, partial_data.data_len, fp);
+    if(num_bytes < partial_data.data_len) {
+      perror("fread");
+      return -1;
+    }
+
+    xdr_free((xdrproc_t)xdr_data, (char *)&partial_data);
+
+    fprintf(stderr, ".");
+  }
 
   return 0;
 }

@@ -199,11 +199,11 @@ load_vm_from_attachment_1_svc(char *vm_name, char *patch_file, int *result,  str
 }
 
 
-static char files[2][PATH_MAX];
-static char num_files = 0;
+static char  files[2][PATH_MAX];
+static char  num_files = 0;
 
-static FILE *attachment = NULL;
-static int attachment_size = 0;
+static FILE *write_attachment = NULL;
+static int   write_attachment_size = 0;
 
 bool_t
 send_file_1_svc(char *filename, int size, int *result, struct svc_req *rqstp)
@@ -218,7 +218,7 @@ send_file_1_svc(char *filename, int size, int *result, struct svc_req *rqstp)
   fprintf(stderr, "(display-launcher) Receiving file '%s' of size %d..\n", 
 	  filename, size);
 
-  attachment_size = size;
+  write_attachment_size = size;
 
   copy = strdup(filename);
   bname = basename(copy);
@@ -226,8 +226,8 @@ send_file_1_svc(char *filename, int size, int *result, struct svc_req *rqstp)
 
   fprintf(stderr, "(display-launcher) Writing file '%s'\n", files[num_files]);
 
-  attachment = fopen(files[num_files], "w+");
-  if(attachment == NULL) {
+  write_attachment = fopen(files[num_files], "w+");
+  if(write_attachment == NULL) {
     perror("fopen");
     *result = -1;
     return TRUE;
@@ -247,34 +247,114 @@ send_partial_1_svc(data part, int *result,  struct svc_req *rqstp)
 {
   int err;
 
-  if((attachment_size <= 0) || (attachment == NULL)) {
+  if((write_attachment_size <= 0) || (write_attachment == NULL)) {
     result = -1;
     return TRUE;
   }
 
-  err = fwrite(part.data_val, part.data_len, 1, attachment);
+  err = fwrite(part.data_val, part.data_len, 1, write_attachment);
   if(err <= 0) {
     perror("fwrite");
     result = -1;
     return TRUE;
   }
 
-  attachment_size -= part.data_len;
+  write_attachment_size -= part.data_len;
   fprintf(stderr, ".");
 
   *result = 0;
 
-  if(attachment_size < 0)
+  if(write_attachment_size < 0)
     *result = -1;
   
-  if(attachment_size <= 0) {
-    fclose(attachment);
+  if(write_attachment_size <= 0) {
+    fclose(write_attachment);
 
-    fprintf(stderr, "(display-launcher) File transfer complete!\n");
+    fprintf(stderr, "\n(display-launcher) File transfer complete!\n");
 
-    attachment = NULL;
-    attachment_size = 0;
+    write_attachment = NULL;
+    write_attachment_size = 0;
   }
+  
+  return TRUE;
+}
+
+
+static FILE *read_attachment = NULL;
+static int   read_attachment_size = 0;
+
+bool_t
+retrieve_file_1_svc(char *filename, int *result, struct svc_req *rqstp)
+{
+  char *bname, *copy;
+  char localname[PATH_MAX];
+  struct stat buf;
+  int ret;
+
+  copy = strdup(filename);
+  bname = basename(copy);
+  snprintf(localname, PATH_MAX, "/tmp/%s", bname);
+
+  memset(&buf, 0, sizeof(struct stat));
+  ret = stat(localname, &buf);
+  if(ret < 0) {
+    perror("stat");
+    *result = -1;
+    return TRUE;
+  }
+
+  read_attachment = fopen(localname, "r");
+  if(read_attachment == NULL) {
+    perror("fopen");
+    *result = -1;
+    return TRUE;
+  }
+
+  *result = buf.st_size;
+  read_attachment_size = buf.st_size;
+
+  return TRUE;
+}
+
+
+bool_t
+retrieve_partial_1_svc(data *result,  struct svc_req *rqstp)
+{
+  int bytes_read;
+  char *partial_read;
+
+  memset((char *)result, 0, sizeof(data));
+
+  if((read_attachment == NULL) || (read_attachment_size <=0))
+    return FALSE;
+
+  partial_read = (char *)malloc(CHUNK_SIZE);
+  if(partial_read == NULL) {
+    perror("malloc");
+    return FALSE;
+  }
+
+  bytes_read = fread(partial_read, CHUNK_SIZE, 1, read_attachment);
+  if(bytes_read <= 0) {
+    perror("fread");
+    free(partial_read);
+    return FALSE;
+  }
+
+  read_attachment_size -= bytes_read;
+  fprintf(stderr, ".");
+
+  if(read_attachment_size <= 0) {
+    fclose(read_attachment);
+
+    fprintf(stderr, "\n(display-launcher) Outgoing file transfer complete!\n");
+
+    read_attachment = NULL;
+    read_attachment_size = 0;
+  }
+
+  result->data_len = bytes_read;
+  result->data_val = partial_read;
   
   return TRUE;
 }
