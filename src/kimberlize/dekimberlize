@@ -1,50 +1,170 @@
 #!/bin/sh
 
-usage()
+########################################################################
+# dekimberlize
+#
+# A script that applies a Kimberlized virtual machine overlay to a base
+# virtual machine in order to install an application and its
+# dependencies on-the-fly.
+#
+
+
+
+########################################################################
+# Functions to simplify code.
+#
+
+
+#
+## Print the command's syntax.
+#
+
+function usage()
 {
-	echo "usage: `basename $0` [-d floppy-file] <[-f patch-file] || [-i URL]> <vm-name>"
+    echo "usage: `basename $0` [-d floppy-file] <[-f patch-file] || [-i URL]> <vm-name>"
 }
 
-failure()
+
+#
+## Cleanup any loose state and fail with bad exit status.
+#
+
+function failure()
 {
-	rm -f /tmp/dekimberlize.lock
-	exit 1
+    rm -f /tmp/dekimberlize.lock
+    exit 1
 }
 
+
+#
+## Check whether a virtual machine is running.  
+##   $1: The vm's name or UUID
+##   $?: 1 if running, 0 if not
+#
+
+function vm_running()
+{
+    uuid=`VBoxManage showvminfo $1 | grep UUID | head -1 | sed -e 's/ //g' | cut -f2 -d':'`
+    running=`VBoxManage list runningvms | grep $uuid`
+
+    if [ uuid = running ];
+        return 1
+    fi
+
+    return 0
+}
+
+
+#
+## Poll VirtualBox about a VM until it is running.
+##   $1: The vm's name or UUID
+##   $2: The number of seconds until timeout
+##   $?: 1 if running, 0 if not
+#
+
+function sleep_until_vm_running()
+{
+    for ((i=0;i<$2;i+=1)); do
+        vm_running $1
+        vm_status=$?
+
+        if [ $vm_status -eq 1 ]; then
+            return 1
+        fi
+        sleep 1s
+    done
+
+    return 0
+}
+
+
+#
+## Poll VirtualBox about a VM until it is stopped.
+##   $1: The vm's name or UUID
+##   $2: The number of seconds until timeout
+##   $?: 1 if stopped, 0 if not
+#
+
+function sleep_until_vm_stopped()
+{
+    for ((i=0;i<$2;i+=1)); do
+        vm_running $1
+        vm_status=$?
+
+        if [ $vm_status -eq 0 ]; then
+            return 1
+        fi
+        sleep 1s
+    done
+
+    return 0
+}
+
+
+########################################################################
+# Beginning of actual dekimberlize script execution
+#
+    
 if [ $# -lt 3 ]; then
 	usage
 	exit 1
 fi
 
-# Randomly generated port to connect to OpenDiamond on.  Forwarded directly.
+
 homedir=`printenv HOME`
-floppy_file=""
+
+
+#
+## Default variables for managing floppy disk attachment
+## and binary difference detection.
+#
+
+floppy_original=""
+floppy_copy=""
+floppy_diff=""
+
+
+########################################################################
+# Process command-line options.
+#
 
 while getopts ":d:f:i:h" Option
 do
-    case $Option in
-        d)
-			floppy_file=$OPTARG
-            echo "Using floppy disk image file '$floppy_file'.."
-            ;;
-        f)
-			patch_file=$OPTARG
-            echo "Using kimberlize patch file '$patch_file'.."
-            ;;
-        i)
-            echo "Downloading and using kimberlize patch file '$OPTARG'.."
-			patch_file=`basename $OPTARG`
-			wget -O /tmp/$patch_file $OPTARG
-            patch_file=/tmp/$patch_file
-            ;;
-        h)
-            usage
-            exit 0
-            ;;
-        ?)
-            usage
-            exit 1
-            ;;
+  case $Option in
+
+      d)
+    floppy_original=$OPTARG
+    floppy_copy="${OPTARG}.new"
+    floppy_diff="${OPTARG}.diff"
+
+    echo
+    echo "Received floppy disk image file '$floppy_original'.."
+    ;;
+    
+      f)
+    patch_file=$OPTARG
+    echo
+    echo "Using kimberlize patch file '$patch_file'.."
+    ;;
+
+      i)
+    patch_file=`basename $OPTARG`
+    echo
+    echo "Downloading and using kimberlize patch file '$patch_file'.."
+    wget -O /tmp/$patch_file $OPTARG
+    patch_file=/tmp/$patch_file
+    ;;
+
+      h)
+    usage
+    exit 0
+    ;;
+	    
+      ?)
+    usage
+    exit 1
+    ;;
+
     esac
 done
 shift $(($OPTIND-1))
@@ -89,10 +209,10 @@ rm -f /tmp/dekimberlize_finished
 
 
 ########################################################################
-# Apply kimberlized tarball to the specified VM.
+# Apply kimberlized tarball to the specified VM, decompressing
+# first if necessary.
 #
 
-# decompress if necessary
 echo
 echo "Checking for compression.."
 compressed=`echo $patch_file | grep lzma`
@@ -105,10 +225,13 @@ if [ "$compressed" != "" ]; then
 	echo "New patch file: $patch_file"
 fi
 
-# untar into VM's directory;  this will overwrite the .xml metadata file,
-# add the Snapshots/*.vdi binary difference to the disk state, and also
-# add a .diff file repesenting the binary difference in memory state,
-# which must be parsed.  Also, save the names of files we create.
+#
+## Untar into VM's directory;  this will overwrite the .xml metadata file,
+## add the Snapshots/*.vdi binary difference files to the disk state, and
+## also add a .diff file repesenting the binary difference in memory state,
+## which must be applied with xdelta.  Also, save the names of files
+## we create.
+#
 
 echo
 echo "Untarring.."
@@ -141,7 +264,8 @@ VBoxManage setextradata $1 "VBoxInternal/Devices/pcnet/0/LUN#0/Config/diamond_ss
 
 
 ########################################################################
-# Launch VM using VirtualBox.  Now we will create our custom state.
+# Launch VM using VirtualBox now that the application of the VM
+# overlay is complete.
 #
 
 echo
@@ -153,15 +277,30 @@ if [ $? -ne 0 ]; then
 fi
 
 
-########################################################################
-# Wait a little and attach a floppy disk image to a running VM.
+#
+## Copy and attach a floppy disk image to a running VM, if
+## the user has provided one.
 #
 
-if [ $floppy_file != "" ]; then
-    sleep 20s
+if [ $floppy_original != "" ]; then
+
     echo
-    echo "Attaching floppy disk '$floppy_file' to VM.."
-    VBoxManage controlvm $1 floppyattach $floppy_file
+    echo "Copying '$floppy_original' to '$floppy_copy' and attaching"
+    echo "it as a floppy disk to the VM.."
+    cp $floppy_original $floppy_copy
+
+
+    echo
+    echo "Waiting for VM to load.."
+    sleep_until_vm_running $1 300
+    if [ $? -ne 1 ]; then
+        echo "VM did not load! Stopping Dekimberlize process.."
+        failure
+    fi
+
+    echo
+    echo "Attaching floppy disk '$floppy_original' to VM.."
+    VBoxManage controlvm $1 floppyattach $floppy_copy
     if [ $? -ne 0 ]; then
     	echo `basename $0`: error: failed attaching floppy disk 
     fi
@@ -177,6 +316,7 @@ fi
 # This is done by touching /tmp/dekimberlize_finished in the host.
 #
 
+echo
 echo "VM loaded! Waiting for the user to finish.."
 while [ ! -e /tmp/dekimberlize_finished ]; do
 	printf . || true
@@ -191,11 +331,13 @@ echo "The user has ended the session."
 # Now clean up, tossing the dirty state and removing the port forwarding.
 #
 
-########################################################################
-# Detach floppy disk image.
+
+#
+## Detach floppy disk image.  This must be done while the virtual
+## machine is running.
 #
 
-if [ $floppy_file != "" ]; then
+if [ $floppy_original != "" ]; then
     echo
     echo "Detaching floppy disk from VM.."
 	VBoxManage controlvm $1 floppyattach none
@@ -205,8 +347,8 @@ if [ $floppy_file != "" ]; then
 fi
 
 
-########################################################################
-# Power down VM as quickly as possible.
+#
+## Power down VM as quickly as possible.
 #
 
 echo
@@ -218,20 +360,38 @@ if [ $? -ne 0 ]; then
 fi
 
 
-########################################################################
-# Unregister floppy disk image (a side effect of attachment).
+
+#
+## Unregister floppy disk image (registering is a side effect 
+## of attachment).
 #
 
-if [ $floppy_file != "" ]; then
+if [ $floppy_original != "" ]; then
     echo
     echo "Unregistering floppy disk with VirtualBox.."
-	VBoxManage unregisterimage floppy $floppy_file
+	VBoxManage unregisterimage floppy $floppy_copy
     if [ $? -ne 0 ]; then
         echo `basename $0`: error: failed attaching floppy disk
     fi
 fi
 
 sleep 2s
+
+
+#
+## Calculate the binary difference of the floppy image against a copy
+## of itself saved before attachment.
+#
+
+echo
+echo "Calculating the floppy's binary difference in file '$floppy_diff'.."
+xdelta delta $floppy_original $floppy_copy $floppy_diff
+
+
+#
+## Revert the snapshot taken in the Kimberlize process, restoring the
+## virtual machine to its base image.
+#
 
 echo
 echo "Discarding dirty state and restoring the original VM image.."
@@ -254,7 +414,8 @@ echo "Complete!"
 
 
 ########################################################################
-# Info:
+# Miscellaneous Information:
+#
 # *.vdi represent virtual disk images.  The oldest is the original install,
 #   stored in a user's ~/.VirtualBox/VDI/ directory.  It is kept pristine.
 #   The active difference file is updated whenever the virtual disk is written,
