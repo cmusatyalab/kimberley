@@ -1,7 +1,13 @@
 #!/bin/bash
 
+########################################################################
+# Create a new floppy disk image (FAT32) to be used during
+# dekimberlize as a persistent storage device.
+#
+
 output_file="/tmp/floppy"
-size=102400
+
+megabytes=10
 
 usage()
 {
@@ -14,13 +20,10 @@ do
     case $Option in
         o)
             output_file=$OPTARG
-            echo "Outputting floppy to file '$output_file'.."
             ;;
         s)
-            size=$OPTARG
-            declare -i size
-            echo "Creating floppy of size $size MB.."
-            size=`echo "scale=1; 1024*$size" | bc`
+            megabytes=$OPTARG
+            declare -i megabytes
             ;;
         h)
             usage
@@ -34,12 +37,14 @@ do
 done
 shift $(($OPTIND-1))
 
+size=`echo "scale=1; 1024*$megabytes" | bc`
 
-########################################################################
-# Create a new floppy disk image (FAT32)
-#
 
-mkdosfs -C -F 32 $output_file $size
+echo
+echo "Creating floppy '$output_file' of size $megabytes MB.."
+echo
+mkdosfs -v -C -F 32 $output_file $size
+echo
 
 
 exit 0
