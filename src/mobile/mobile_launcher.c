@@ -223,11 +223,10 @@ retrieve_file_in_pieces(char *path, CLIENT *clnt) {
 
 
 int
-establish_thin_client_connection(void) {
+establish_thin_client_connection(DBusGProxy *dbus_proxy) {
   int i, ret;
   guint g_vnc_port = 0;
   GError *gerr = NULL;
-  DBusGProxy *dbus_proxy = NULL;
 
 
   fprintf(stderr, "(mobile-launcher) Calling into DCM to make "
@@ -344,7 +343,11 @@ main(int argc, char *argv[])
   fprintf(stderr, "(mobile-launcher) creating DBus proxy to DCM (%s)..\n",
 	  DCM_DBUS_SERVICE_NAME);
   
-  /* This won't trigger activation! */
+
+  /*
+   * The following D-Bus call will not trigger activation.
+   */
+
   dbus_proxy = dbus_g_proxy_new_for_name(dbus_conn, 
 					 DCM_DBUS_SERVICE_NAME, 
 					 DCM_DBUS_SERVICE_PATH, 
@@ -356,12 +359,15 @@ main(int argc, char *argv[])
   }
 	
 	
-  fprintf(stderr, "(mobile-launcher) DBus calling into dcm for RPC conn..\n");
-
-  /* Signal DCM that you would like it to search for an RPC service.
+  /*
+   * Signal DCM that you would like it to search for an RPC service.
    * The method call will trigger activation.  In other words,
    * if the DCM is not running before this call is made, it will be
-   * afterwards, assuming service files are installed correctly. */
+   * afterwards, assuming service files are installed correctly. 
+   */
+
+  fprintf(stderr, "(mobile-launcher) DBus calling into dcm for RPC conn..\n");
+
   if(!edu_cmu_cs_diamond_opendiamond_dcm_client(dbus_proxy, 
 						LAUNCHER_DCM_SERVICE_NAME, 
 						&g_rpc_port, &gerr)) {
@@ -488,7 +494,7 @@ main(int argc, char *argv[])
    * Signal DCM that you would like it to search for a VNC service.
    */
 
-  vnc_port = establish_thin_client_connection();
+  vnc_port = establish_thin_client_connection(dbus_proxy);
   if(vnc_port < 0) {
     fprintf(stderr, "(mobile-launcher) DCM couldn't discover thin client "
 	    "services!\n");
