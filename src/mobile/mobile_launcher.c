@@ -517,7 +517,7 @@ main(int argc, char *argv[])
   
  cleanup:
   if(clnt != NULL) {
-    char  *diff_filename;
+    char  diff_filename[PATH_MAX];
 
     /*
      * Terminate remote dekimberlize process, retrieving modified
@@ -531,7 +531,7 @@ main(int argc, char *argv[])
       
       snprintf(diff_filename_local, PATH_MAX, "/tmp/%s", diff_filename);
 
-      if(retrieve_file_in_pieces(diff_filename, clnt) < 0) {
+      if(retrieve_file_in_pieces(diff_filename_local, clnt) < 0) {
 	fprintf(stderr, "(mobile-launcher) Couldn't retrieve '%s'\n",
 		diff_filename);
       }
