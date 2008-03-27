@@ -360,6 +360,16 @@ if [ $? -ne 0 ]; then
 fi
 
 
+#
+## Wait for powerdown to complete.
+#
+
+sleep_until_vm_stopped $1 30
+if [ $? -ne 1 ]; then
+    echo "VM did not stop! Stopping Dekimberlize process.."
+    failure
+fi
+
 
 #
 ## Unregister floppy disk image (registering is a side effect 
@@ -374,8 +384,6 @@ if [ $floppy_original != "" ]; then
         echo `basename $0`: error: failed attaching floppy disk
     fi
 fi
-
-sleep 2s
 
 
 #
@@ -406,7 +414,7 @@ VBoxManage setextradata $1 "VBoxInternal/Devices/pcnet/0/LUN#0/Config/diamond_ss
 VBoxManage setextradata $1 "VBoxInternal/Devices/pcnet/0/LUN#0/Config/diamond_ssh/Protocol" > /dev/null
 
 
-rm /tmp/dekimberlize.lock
+rm -f /tmp/dekimberlize.lock
 
 
 echo
