@@ -76,24 +76,38 @@ handle_dekimberlize_thread_setup() {
   port_str[0]='\0';
   do {
     struct timeval tv;
+    struct stat buf;
+    int err;
 
-    tv.tv_sec = 1;
-    tv.tv_usec = 0;
+    memset(&buf, 0, sizeof(struct stat));
 
+    err = stat("/tmp/x11vnc_port", &buf);
+    if(err) {
+      if(err != ENOENT) { 
+	perror("stat"); 
+      }
+    }
+    else if(buf.st_size > 0) {
+      fp = fopen("/tmp/x11vnc_port", "r");
+      if(fp == NULL) { 
+	perror("fopen"); 
+      }
+      else { 
+	continue; 
+      }
+    }
+
+
+  sleep:
 
     /*
      * Sleep a second, waiting for our thin client server to come up.
      */
 
+    tv.tv_sec = 1;
+    tv.tv_usec = 0;
+
     select(0, NULL, NULL, NULL, &tv);
-
-    fp = fopen("/tmp/x11vnc_port", "r");
-
-    if(fp == NULL)
-      if(errno != ENOENT) {
-	perror("fopen");
-	pthread_exit((void *)-1);
-      }
 
     fprintf(stderr, ".");
   }
@@ -484,7 +498,7 @@ use_persistent_state_1_svc(char *filename, int *result,  struct svc_req *rqstp)
   snprintf(current_state.persistent_state_filename, PATH_MAX, 
 	   "/tmp/%s", bname);
   snprintf(current_state.persistent_state_modified_filename, PATH_MAX, 
-	   "/tmp/%s.copy", bname);
+	   "/tmp/%s.new", bname);
   snprintf(current_state.persistent_state_diff_filename, PATH_MAX, 
 	   "/tmp/%s.diff", bname);
 
