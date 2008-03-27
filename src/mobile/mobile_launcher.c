@@ -1,22 +1,27 @@
+#include <errno.h>
+#include <fcntl.h>
+#include <libgen.h>
+#include <math.h>
+#include <netdb.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <sys/time.h>
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <sys/stat.h>
-#include <errno.h>
-#include <fcntl.h>
-#include <glib.h>
-#include <libgen.h>
-#include <math.h>
-#include <netdb.h>
 #include <time.h>
 #include <unistd.h>
+
 #include <dbus/dbus-glib.h>
 #include <dbus/dbus-glib-bindings.h>
+#include <glib.h>
+
 #include "dcm_dbus_app_glue.h"
 #include "rpc_mobile_launcher.h"
 #include "common.h"
+
+
+#define AVAHI_TIMEOUT 15
 
 char command[ARG_MAX];
 
@@ -28,8 +33,8 @@ enum vm_type {
 
 void
 usage(char *argv0) {
-  fprintf(stderr, "%s [-d floppy-file] <[-f patch-file] || [-i URL]> "
-	  "<vm-name>\n", argv0);
+  printf("%s [-d floppy-file] <[-f patch-file] || [-i URL]> <vm-name>\n", 
+	 argv0);
 }
 
 
@@ -161,7 +166,7 @@ send_file_in_pieces(char *path, CLIENT *clnt) {
 
 int
 retrieve_file_in_pieces(char *path, CLIENT *clnt) {
-  int i, n, ret, size=0;
+  int i, n, size=0;
   FILE *fp;
   enum clnt_stat retval;
 
@@ -178,6 +183,7 @@ retrieve_file_in_pieces(char *path, CLIENT *clnt) {
   retval = retrieve_file_1(path, &size, clnt);
   if(retval != RPC_SUCCESS) {
     clnt_perror (clnt, "retrieve_file RPC call failed");
+    fclose(fp);
     return -1;
   }
 
@@ -187,19 +193,21 @@ retrieve_file_in_pieces(char *path, CLIENT *clnt) {
 
   for(i=0; i<n; i++) {
     data partial_data;
-    int num_bytes;
+    unsigned int num_bytes;
 
     memset(&partial_data, 0, sizeof(data));
 
     retval = retrieve_partial_1(&partial_data, clnt);
     if(retval != RPC_SUCCESS) {
       clnt_perror (clnt, "retrieve_partial RPC call failed");
+      fclose(fp);
       return -1;
     }
 
     num_bytes = fwrite(partial_data.data_val, 1, partial_data.data_len, fp);
     if(num_bytes < partial_data.data_len) {
       perror("fread");
+      fclose(fp);
       return -1;
     }
 
@@ -208,7 +216,46 @@ retrieve_file_in_pieces(char *path, CLIENT *clnt) {
     fprintf(stderr, ".");
   }
 
+  fclose(fp);
+
   return 0;
+}
+
+
+int
+establish_thin_client_connection(void) {
+  int i, ret;
+  guint g_vnc_port = 0;
+  GError *gerr = NULL;
+  DBusGProxy *dbus_proxy = NULL;
+
+
+  fprintf(stderr, "(mobile-launcher) Calling into DCM to make "
+	  "thin client connection..\n");
+
+  ret = -1;
+
+  for(i=0; i<AVAHI_TIMEOUT; i++) {
+    if(!edu_cmu_cs_diamond_opendiamond_dcm_client(dbus_proxy, 
+						  VNC_DCM_SERVICE_NAME, 
+						  &g_vnc_port, &gerr)) {
+      struct timeval tv;
+
+      tv.tv_sec = 1;
+      tv.tv_usec = 0;
+
+      g_warning("(mobile-launcher) dcm->client() method failed: %s", 
+		gerr->message);
+      
+      select(0, NULL, NULL, NULL, &tv);
+    }
+    else {
+      ret = g_vnc_port;
+      break;
+    }
+  }
+
+  return ret;
 }
 	  
 
@@ -218,8 +265,9 @@ main(int argc, char *argv[])
   DBusGConnection *dbus_conn;
   DBusGProxy *dbus_proxy = NULL;
   GError *gerr = NULL;
-  guint gport_rpc = 0, gport_vnc = 0;
+  guint g_rpc_port = 0;
   int err, ret = EXIT_SUCCESS, opt;
+  int vnc_port;
   int use_USB = 0;
   char port_str[NI_MAXSERV];
   struct addrinfo *info = NULL, hints;
@@ -316,7 +364,7 @@ main(int argc, char *argv[])
    * afterwards, assuming service files are installed correctly. */
   if(!edu_cmu_cs_diamond_opendiamond_dcm_client(dbus_proxy, 
 						LAUNCHER_DCM_SERVICE_NAME, 
-						&gport_rpc, &gerr)) {
+						&g_rpc_port, &gerr)) {
     /* Method failed, the GError is set, let's warn everyone */
     g_warning("(mobile-launcher) dcm->client() method failed: %s", 
 	      gerr->message);
@@ -325,7 +373,7 @@ main(int argc, char *argv[])
   }
 
   fprintf(stderr, "(mobile-launcher) DCM client() returned port: %d\n", 
-	  gport_rpc);
+	  g_rpc_port);
   
   
   /* Create new loopback connection to the Sun RPC server on the
@@ -341,7 +389,7 @@ main(int argc, char *argv[])
   hints.ai_flags = AI_CANONNAME;
   hints.ai_family = AF_INET;
   hints.ai_socktype = SOCK_STREAM;
-  snprintf(port_str, 6, "%u", gport_rpc);
+  snprintf(port_str, 6, "%u", g_rpc_port);
   
   if((err = getaddrinfo("localhost", port_str, &hints, &info)) < 0) {
     fprintf(stderr, "getaddrinfo: %s\n", gai_strerror(err));
@@ -360,7 +408,8 @@ main(int argc, char *argv[])
   fprintf(stderr, "(mobile-launcher) successfully connected. bringing up "
 	  "launcher..\n");
   
-  clnt = rpc_init(connfd, MOBILELAUNCHER_PROG, MOBILELAUNCHER_VERS);
+  clnt = convert_socket_to_rpc_client(connfd, MOBILELAUNCHER_PROG, 
+				      MOBILELAUNCHER_VERS);
   if(clnt == NULL) {
     fprintf(stderr, "(mobile-launcher) Sun RPC initialization failed");
     close(connfd);
@@ -383,17 +432,19 @@ main(int argc, char *argv[])
 
   if(floppy_path != NULL) {
     fprintf(stderr, "(mobile-launcher) Sending floppy disk image..\n");
-
-    retval = use_persistent_state_1(floppy_path, &err, clnt);
-    if (retval != RPC_SUCCESS) {
-      fprintf(stderr, "(mobile-launcher) setting persistent state file "
-	      "failed: %s", clnt_sperrno(retval));
-      ret = EXIT_FAILURE;
-      goto cleanup;
-    }
-
-    if(send_file_in_pieces(floppy_path, clnt) < 0)  //not a total failure case
+    
+    if(send_file_in_pieces(floppy_path, clnt) < 0) {
       fprintf(stderr, "(mobile-launcher) failed sending floppy disk image\n");
+      floppy_path = NULL;
+    }
+    else {
+      retval = use_persistent_state_1(floppy_path, &err, clnt);
+      if (retval != RPC_SUCCESS) {
+	fprintf(stderr, "(mobile-launcher) setting persistent state file "
+		"failed: %s", clnt_sperrno(retval));
+	floppy_path = NULL;
+      }
+    }
   }
 
   switch(vmt) {
@@ -432,25 +483,26 @@ main(int argc, char *argv[])
     goto cleanup;
   }
 
-  fprintf(stderr, "(mobile-launcher) DBus calling into DCM for VNC conn..\n");
 
-  /* Signal DCM that you would like it to search for a VNC service. */
-  if(!edu_cmu_cs_diamond_opendiamond_dcm_client(dbus_proxy, 
-						VNC_DCM_SERVICE_NAME, 
-						&gport_vnc, &gerr)) {
-    /* Method failed, the GError is set, let's warn everyone */
-    g_warning("(mobile-launcher) dcm->client() method failed: %s", 
-	      gerr->message);
+  /*
+   * Signal DCM that you would like it to search for a VNC service.
+   */
+
+  vnc_port = establish_thin_client_connection();
+  if(vnc_port < 0) {
+    fprintf(stderr, "(mobile-launcher) DCM couldn't discover thin client "
+	    "services!\n");
     ret = EXIT_FAILURE;
     goto cleanup;
   }
-
-  fprintf(stderr, "(mobile-launcher) DCM client() returned port: %d\n", 
-	  gport_vnc);
+  else {
+    fprintf(stderr, "(mobile-launcher) DCM client() returned port: %d\n", 
+	    vnc_port);
+  }
 
   fprintf(stderr, "(mobile-launcher) executing vncviwer..\n");
 
-  snprintf(command, ARG_MAX, "vncviewer localhost::%u", gport_vnc);
+  snprintf(command, ARG_MAX, "vncviewer localhost::%u", vnc_port);
   err = system(command);
   if(err < 0) {
     perror("system");
@@ -459,8 +511,32 @@ main(int argc, char *argv[])
 
   
  cleanup:
-  if(clnt != NULL)
-    end_usage_1(0, (void *)NULL, clnt); // signal display
+  if(clnt != NULL) {
+    char  *diff_filename;
+
+    /*
+     * Terminate remote dekimberlize process, retrieving modified
+     * persistent state, if necessary.
+     */
+
+    end_usage_1(0, &diff_filename, clnt);
+
+    if(floppy_path != NULL) {
+      char  diff_filename_local[PATH_MAX];
+      
+      snprintf(diff_filename_local, PATH_MAX, "/tmp/%s", diff_filename);
+
+      if(retrieve_file_in_pieces(diff_filename, clnt) < 0) {
+	fprintf(stderr, "(mobile-launcher) Couldn't retrieve '%s'\n",
+		diff_filename);
+      }
+    }
+
+    xdr_free((xdrproc_t) xdr_wrapstring, (char *)&diff_filename);
+
+    clnt_destroy(clnt);
+    clnt = NULL;
+  }
   
 
   if(gerr) g_error_free (gerr);

@@ -13,42 +13,42 @@ program MOBILELAUNCHER_PROG {
      * Calls to transfer the VM overlay.
      */
     
-    int  load_vm_from_URL(string vm_name<128>, string patch_URL<1024>) = 1;
-    int  load_vm_from_path(string vm_name<128>, string patch_path<1024>) = 2;
-    int  load_vm_from_attachment(string vm_name<128>, string patch_file<1024>) = 3;
+    int     load_vm_from_URL(string vm_name<128>, string patch_URL<1024>) = 1;
+    int     load_vm_from_path(string vm_name<128>, string patch_path<1024>) = 2;
+    int     load_vm_from_attachment(string vm_name<128>, string patch_file<1024>) = 3;
 
     
     /*
      * Call to support sending large files through RPC.
      */
     
-    int  send_file(string filename<1024>, int size) = 4;
-    int  send_partial(data part) = 5;
+    int     send_file(string filename<1024>, int size) = 4;
+    int     send_partial(data part) = 5;
     
-    int  retrieve_file(string filename<1024>) = 6;
-    data retrieve_partial(void) = 7;
+    int     retrieve_file(string filename<1024>) = 6;
+    data    retrieve_partial(void) = 7;
 
 
     /*
      * Calls to support USB networking.
      */
     
-    void ping(void) = 8;
-    int use_USB_cable(void) = 9;
+    void    ping(void) = 8;
+    int     use_USB_cable(void) = 9;
     
     
     /*
      * Calls to support floppy disk persistent state.
      */
     
-    int  use_persistent_state(string filename<1024>) = 10;
+    int     use_persistent_state(string filename<1024>) = 10;
 
     
     /*
      * Calls to indicate a change in user status.
      */
     
-    void end_usage(int retrieve_state) = 11;
+    string  end_usage(int retrieve_state) = 11;
 
   } = 1;
 } = 0x2A2ADEBF;  /* The leading "0x2" is required for "static"

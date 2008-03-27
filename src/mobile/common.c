@@ -373,7 +373,8 @@ setup_rpc_server_and_connection(unsigned int prog, unsigned int vers,
  * makes it into a TS-RPC (Sun RPC) client handle. */
 
 CLIENT *
-rpc_init(int connfd, unsigned int prog, unsigned int vers) {
+convert_socket_to_rpc_client(int connfd, unsigned int prog, 
+			     unsigned int vers) {
   struct sockaddr_in control_name;
   struct timeval tv;
   unsigned int control_name_len = sizeof(struct sockaddr);

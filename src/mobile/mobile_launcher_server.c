@@ -12,15 +12,23 @@
 #include "common.h"
 
 
-static char command[ARG_MAX];
-static char persistent_state_filename[PATH_MAX];
+static char  command[ARG_MAX];
+
 
 void *
 launch_display_scripts(void *arg) {
   int err;
 
-  fprintf(stderr, "(launcher-rpc-server) Executing display script: %s\n",
+  fprintf(stderr, "(display-launcher) Executing display script: %s\n",
 	  command);
+  err = pthread_mutex_lock(&current_state.mutex);
+  if(err < 0) {
+    fprintf(stderr, "(display-launcher) pthread_mutex_lock returned "
+	    "error: %d\n", err);
+    pthread_exit((void *)-1);
+  }
+
+  current_state.display_in_progress = 1;
 
   err = system(command);
   if(err < 0) {
@@ -28,7 +36,16 @@ launch_display_scripts(void *arg) {
     pthread_exit((void *)-1);
   }
   
-  fprintf(stderr, "(launcher-rpc-server) Display scripts completed.\n");
+  current_state.display_in_progress = 0;
+
+  err = pthread_mutex_unlock(&current_state.mutex);
+  if(err < 0) {
+    fprintf(stderr, "(display-launcher) pthread_mutex_unlock returned "
+	    "error: %d\n", err);
+    pthread_exit((void *)-1);
+  }
+
+  fprintf(stderr, "(display-launcher) Display scripts completed.\n");
 
   pthread_exit((void *)0);
 }
@@ -45,7 +62,7 @@ handle_dekimberlize_thread_setup() {
   memset(&tid, 0, sizeof(pthread_t));
   err = pthread_create(&tid, NULL, launch_display_scripts, NULL);
   if(err != 0) {
-    fprintf(stderr, "(launcher-rpc-server) failed creating thread\n");
+    fprintf(stderr, "(display-launcher) failed creating thread\n");
     return -1;
   }
 
@@ -74,7 +91,7 @@ handle_dekimberlize_thread_setup() {
   }
   while(fp == NULL);
 
-  fprintf(stderr, "(launcher-rpc-server) opened /tmp/x11vnc_port!\n");
+  fprintf(stderr, "(display-launcher) opened /tmp/x11vnc_port!\n");
 
   do {
     char *str = fgets(port_str, MAXPATHLEN, fp);
@@ -108,11 +125,11 @@ handle_dekimberlize_thread_setup() {
 
   port = atoi(port_str);
 
-  fprintf(stderr, "(launcher-rpc-server) Registering VNC port %u with Avahi\n",
+  fprintf(stderr, "(display-launcher) Registering VNC port %u with Avahi\n",
 	  port);
 
   if(create_dcm_service(VNC_DCM_SERVICE_NAME, port) < 0) {
-    fprintf(stderr, "(launcher-rpc-server) failed creating "
+    fprintf(stderr, "(display-launcher) failed creating "
 	    "VNC service in DCM..\n");
     return -1;
   }
@@ -126,13 +143,13 @@ load_vm_from_path_1_svc(char *vm_name, char *patch_path, int *result, struct svc
 {
   
   if((vm_name == NULL) || (patch_path == NULL) || (result == NULL)) {
-    fprintf(stderr, "(launcher-rpc-server) Bad args to vm_path!\n");
+    fprintf(stderr, "(display-launcher) Bad args to vm_path!\n");
     if(result)
       *result = -1;
     return FALSE;
   }
 
-  fprintf(stderr, "(launcher-rpc-server) Preparing new VNC display with "
+  fprintf(stderr, "(display-launcher) Preparing new VNC display with "
 	  "vm '%s', kimberlize patch '%s'..\n", vm_name, patch_path);
 
   snprintf(command, ARG_MAX, "display_setup -f %s %s", patch_path, vm_name);
@@ -148,13 +165,13 @@ load_vm_from_url_1_svc(char *vm_name, char *patch_URL, int *result,  struct svc_
 {
     
   if((vm_name == NULL) || (patch_URL == NULL) || (result == NULL)) {
-    fprintf(stderr, "(launcher-rpc-server) Bad args to vm_path!\n");
+    fprintf(stderr, "(display-launcher) Bad args to vm_path!\n");
     if(result)
       *result = -1;
     return FALSE;
   }
 
-  fprintf(stderr, "(launcher-rpc-server) Preparing new VNC display with "
+  fprintf(stderr, "(display-launcher) Preparing new VNC display with "
 	  "vm '%s', kimberlize patch '%s'..\n", vm_name, patch_URL);
 
   snprintf(command, ARG_MAX, "display_setup -i %s %s", patch_URL, vm_name);
@@ -169,27 +186,49 @@ load_vm_from_url_1_svc(char *vm_name, char *patch_URL, int *result,  struct svc_
 bool_t
 load_vm_from_attachment_1_svc(char *vm_name, char *patch_file, int *result,  struct svc_req *rqstp)
 {
+  int err;
   char patch_path[PATH_MAX], *bname, *copy;
   
   if((vm_name == NULL) || (patch_path == NULL) || (result == NULL)) {
-    fprintf(stderr, "(launcher-rpc-server) Bad args to vm_path!\n");
-    if(result)
-      *result = -1;
+    fprintf(stderr, "(display-launcher) Bad args to vm_path!\n");
+    *result = -1;
     return FALSE;
   }
 
-  fprintf(stderr, "(launcher-rpc-server) Preparing new VNC display with "
+  fprintf(stderr, "(display-launcher) Preparing new VNC display with "
 	  "vm '%s', attached kimberlize patch '%s'..\n", vm_name, patch_file);
 
   copy = strdup(patch_file);
   bname = basename(copy);
-  snprintf(patch_path, PATH_MAX, "/tmp/%s", bname);
 
-  if(strlen(persistent_state_filename) > 0)
+  err = pthread_mutex_lock(&current_state.mutex);
+  if(err < 0) {
+    fprintf(stderr, "(display-launcher) pthread_mutex_lock returned "
+	    "error: %d\n", err);
+    *result = -1;
+    free(copy);
+    return FALSE;
+  }
+
+  snprintf(current_state.overlay_filename, PATH_MAX, "/tmp/%s", bname);
+
+  err = pthread_mutex_unlock(&current_state.mutex);
+  if(err < 0) {
+    fprintf(stderr, "(display-launcher) pthread_mutex_unlock returned "
+	    "error: %d\n", err);
+    *result = -1;
+    free(copy);
+    return FALSE;
+  }
+
+  if(strlen(current_state.persistent_state_filename) > 0)
     snprintf(command, ARG_MAX, "display_setup -d %s -f %s %s",
-	     persistent_state_filename, patch_path, vm_name);
+	     current_state.persistent_state_filename, 
+	     current_state.overlay_filename,
+	     vm_name);
   else
-    snprintf(command, ARG_MAX, "display_setup -f %s %s", patch_path, vm_name);
+    snprintf(command, ARG_MAX, "display_setup -f %s %s", 
+	     current_state.overlay_filename, vm_name);
 
   free(copy);
 
@@ -199,9 +238,6 @@ load_vm_from_attachment_1_svc(char *vm_name, char *patch_file, int *result,  str
 }
 
 
-static char  files[2][PATH_MAX];
-static char  num_files = 0;
-
 static FILE *write_attachment = NULL;
 static int   write_attachment_size = 0;
 
@@ -209,31 +245,26 @@ bool_t
 send_file_1_svc(char *filename, int size, int *result, struct svc_req *rqstp)
 {
   char *bname, *copy;
-
-  if(num_files >= 2) {
-    *result = -1;
-    return TRUE;
-  }
+  char local_filename[PATH_MAX];
 
   fprintf(stderr, "(display-launcher) Receiving file '%s' of size %d..\n", 
 	  filename, size);
 
-  write_attachment_size = size;
-
   copy = strdup(filename);
   bname = basename(copy);
-  snprintf(files[num_files], PATH_MAX, "/tmp/%s", bname);
+  snprintf(local_filename, PATH_MAX, "/tmp/%s", bname);
 
-  fprintf(stderr, "(display-launcher) Writing file '%s'\n", files[num_files]);
+  fprintf(stderr, "(display-launcher) Writing file '%s'\n", local_filename);
 
-  write_attachment = fopen(files[num_files], "w+");
+  write_attachment = fopen(local_filename, "w+");
   if(write_attachment == NULL) {
     perror("fopen");
+    free(copy);
     *result = -1;
     return TRUE;
   }
 
-  num_files++;
+  write_attachment_size = size;
 
   free(copy);
   *result = 0;
@@ -248,14 +279,14 @@ send_partial_1_svc(data part, int *result,  struct svc_req *rqstp)
   int err;
 
   if((write_attachment_size <= 0) || (write_attachment == NULL)) {
-    result = -1;
+    *result = -1;
     return TRUE;
   }
 
   err = fwrite(part.data_val, part.data_len, 1, write_attachment);
   if(err <= 0) {
     perror("fwrite");
-    result = -1;
+    *result = -1;
     return TRUE;
   }
 
@@ -361,18 +392,43 @@ retrieve_partial_1_svc(data *result,  struct svc_req *rqstp)
 
 
 bool_t
-end_usage_1_svc(int retrieve_state, void *result,  struct svc_req *rqstp)
+end_usage_1_svc(int retrieve_state, char **result, struct svc_req *rqstp)
 {
-  int fd, i;
+  int fd, i, err;
 
   fd = open("/tmp/dekimberlize_finished", O_RDWR|O_CREAT);
   close(fd);
 
-  for(i=0; i<num_files; i++)
-    remove(files[i]);
-  
-  persistent_state_filename[0]='\0';
-  num_files = 0;
+  *result = (char *)malloc(PATH_MAX * sizeof(char));
+  if(*result == NULL) {
+    perror("malloc");
+    return FALSE;
+  }
+  result[0] = '\0';
+
+  if(retrieve_state > 0) {
+    int err;
+
+    err = pthread_mutex_lock(&current_state.mutex);
+    if(err < 0) {
+      fprintf(stderr, "(display-launcher) pthread_mutex_lock returned "
+	      "error: %d\n", err);
+      return FALSE;
+    }
+    
+    strncpy(*result, current_state.persistent_state_diff_filename, PATH_MAX);
+    *result[PATH_MAX-1]='\0';
+    
+    err = pthread_mutex_unlock(&current_state.mutex);
+    if(err < 0) {
+      fprintf(stderr, "(display-launcher) pthread_mutex_unlock returned "
+	      "error: %d\n", err);
+      return FALSE;
+    }
+  }
+  else {
+    *result = NULL;
+  }
 
   return TRUE;
 }
@@ -381,7 +437,6 @@ end_usage_1_svc(int retrieve_state, void *result,  struct svc_req *rqstp)
 bool_t
 ping_1_svc(void *result, struct svc_req *rqstp)
 {
-  fprintf(stderr, "Pong!\n");
   return TRUE;
 }
 
@@ -392,17 +447,55 @@ use_usb_cable_1_svc(int *result, struct svc_req *rqstp)
   return TRUE;
 }
 
+
+/*
+ * This call specifies that a persistent state is ready to be
+ * shipped over the wire, that will be attached to a running
+ * virtual machine by the Dekimberlize process.  The system
+ * then expects the next file to be sent to be this.
+ */
+
 bool_t
 use_persistent_state_1_svc(char *filename, int *result,  struct svc_req *rqstp)
 {
+  int err;
   char *bname, *copy;
 
   copy = strdup(filename);
   bname = basename(copy);
-  snprintf(persistent_state_filename, PATH_MAX, "/tmp/%s", bname);
 
-  fprintf(stderr, "(display-launcher) Using persistent state file '%s'\n",
-	  persistent_state_filename);
+  err = pthread_mutex_lock(&current_state.mutex);
+  if(err < 0) {
+    fprintf(stderr, "(display-launcher) pthread_mutex_lock returned "
+	    "error: %d\n", err);
+    free(copy);
+    *result = -1;
+    return FALSE;
+  }
+  
+  snprintf(current_state.persistent_state_filename, PATH_MAX, 
+	   "/tmp/%s", bname);
+  snprintf(current_state.persistent_state_modified_filename, PATH_MAX, 
+	   "/tmp/%s.copy", bname);
+  snprintf(current_state.persistent_state_filename, PATH_MAX, 
+	   "/tmp/%s.diff", bname);
+
+  err = pthread_mutex_unlock(&current_state.mutex);
+  if(err < 0) {
+    fprintf(stderr, "(display-launcher) pthread_mutex_unlock returned "
+	    "error: %d\n", err);
+    *result = -1;
+    free(copy);
+    return FALSE;
+  }
+
+  fprintf(stderr, "(display-launcher) Using persistent state:\n"
+	  "\t original file: %s\n"
+	  "\t modified file: %s\n"
+	  "\t binary difference file: %s\n",
+	  current_state.persistent_state_filename,
+	  current_state.persistent_state_modified_filename,
+	  current_state.persistent_state_diff_filename);
 
   free(copy);
   *result = 0;
@@ -410,11 +503,6 @@ use_persistent_state_1_svc(char *filename, int *result,  struct svc_req *rqstp)
   return TRUE;
 }
 
-bool_t
-retrieve_persistent_state_1_svc(data *result, struct svc_req *rqstp)
-{
-  return TRUE;
-}
 
 int
 mobilelauncher_prog_1_freeresult(SVCXPRT *transp, xdrproc_t xdr_result, caddr_t result)
