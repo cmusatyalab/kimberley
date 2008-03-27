@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/bash
 
 ########################################################################
 # dekimberlize
@@ -19,7 +19,7 @@
 ## Print the command's syntax.
 #
 
-function usage()
+usage()
 {
     echo "usage: `basename $0` [-d floppy-file] <[-f patch-file] || [-i URL]> <vm-name>"
 }
@@ -29,7 +29,7 @@ function usage()
 ## Cleanup any loose state and fail with bad exit status.
 #
 
-function failure()
+failure()
 {
     rm -f /tmp/dekimberlize.lock
     exit 1
@@ -42,12 +42,12 @@ function failure()
 ##   $?: 1 if running, 0 if not
 #
 
-function vm_running()
+vm_running()
 {
     uuid=`VBoxManage showvminfo $1 | grep UUID | head -1 | sed -e 's/ //g' | cut -f2 -d':'`
     running=`VBoxManage list runningvms | grep $uuid`
 
-    if [ uuid = running ];
+    if [ "$uuid" = "$running" ]; then
         return 1
     fi
 
@@ -62,7 +62,7 @@ function vm_running()
 ##   $?: 1 if running, 0 if not
 #
 
-function sleep_until_vm_running()
+sleep_until_vm_running()
 {
     for ((i=0;i<$2;i+=1)); do
         vm_running $1
@@ -85,7 +85,7 @@ function sleep_until_vm_running()
 ##   $?: 1 if stopped, 0 if not
 #
 
-function sleep_until_vm_stopped()
+sleep_until_vm_stopped()
 {
     for ((i=0;i<$2;i+=1)); do
         vm_running $1
@@ -285,8 +285,7 @@ fi
 if [ $floppy_original != "" ]; then
 
     echo
-    echo "Copying '$floppy_original' to '$floppy_copy' and attaching"
-    echo "it as a floppy disk to the VM.."
+    echo "Copying original '$floppy_original' to mutable '$floppy_copy'.."
     cp $floppy_original $floppy_copy
 
 
