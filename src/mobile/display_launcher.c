@@ -76,7 +76,7 @@ cleanup(void) {
 
 void
 catch_sigint(int sig) {
-  fprintf(stderr, "(display-launcher) SIGINT caught.  Cleaning up..");
+  fprintf(stderr, "\n(display-launcher) SIGINT caught.  Cleaning up..\n");
   cleanup();
   exit(EXIT_SUCCESS);
 }

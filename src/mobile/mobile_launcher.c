@@ -506,9 +506,8 @@ main(int argc, char *argv[])
 	    vnc_port);
   }
 
-  fprintf(stderr, "(mobile-launcher) executing vncviwer..\n");
-
   snprintf(command, ARG_MAX, "vncviewer localhost::%u", vnc_port);
+  fprintf(stderr, "(mobile-launcher) executing: %s\n", command);
   err = system(command);
   if(err < 0) {
     perror("system");

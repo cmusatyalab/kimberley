@@ -67,14 +67,27 @@ handle_dekimberlize_thread_setup() {
   }
 
 
-  /* At this point, a new nested X server and a VNC server connected to it
+  /*
+   * At this point, a new nested X server and a VNC server connected to it
    * will soon be created, listening for connections on a port specified
-   * in /tmp/x11vnc_port.  dekimberlize is loading the vm in the background. */
+   * in /tmp/x11vnc_port.  dekimberlize is loading the vm in the background.
+   */
 
   port_str[0]='\0';
   do {
     struct timeval tv;
-    fp = fopen("/tmp/x11vnc_port", "r+");
+
+    tv.tv_sec = 1;
+    tv.tv_usec = 0;
+
+
+    /*
+     * Sleep a second, waiting for our thin client server to come up.
+     */
+
+    select(0, NULL, NULL, NULL, &tv);
+
+    fp = fopen("/tmp/x11vnc_port", "r");
 
     if(fp == NULL)
       if(errno != ENOENT) {
@@ -83,11 +96,6 @@ handle_dekimberlize_thread_setup() {
       }
 
     fprintf(stderr, ".");
-    tv.tv_sec = 1;
-    tv.tv_usec = 0;
-
-    /* Sleep a second, then try again. */
-    select(0, NULL, NULL, NULL, &tv);
   }
   while(fp == NULL);
 
@@ -477,7 +485,7 @@ use_persistent_state_1_svc(char *filename, int *result,  struct svc_req *rqstp)
 	   "/tmp/%s", bname);
   snprintf(current_state.persistent_state_modified_filename, PATH_MAX, 
 	   "/tmp/%s.copy", bname);
-  snprintf(current_state.persistent_state_filename, PATH_MAX, 
+  snprintf(current_state.persistent_state_diff_filename, PATH_MAX, 
 	   "/tmp/%s.diff", bname);
 
   err = pthread_mutex_unlock(&current_state.mutex);
