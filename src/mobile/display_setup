@@ -8,15 +8,18 @@
 
 x_res=`xdpyinfo | grep dimensions | head -1 | sed -e 's/ //g' | cut -f2 -d':' | cut -f1 -d'x'`
 y_res=`echo $x_res*3/5 | bc`
-resolution=`echo "$x_res\c"; echo "x\c"; echo "$y_res\c"`
+resolution=`echo ${x_res}x${y_res}`
 
 
 ########################################################################
 # Set up VNC server to allow remote connection to new X server
 #
-scale=`echo "770/\c"; echo "$x_res\c"`
+scale=`echo "770/${x_res}"`
 
-x11vnc -once -display :0.0 -scale $scale > /tmp/x11vnc_port 2> /dev/null &
+echo "Local resolution: $resolution"
+echo x11vnc -once -display :0.0 -scale $scale 
+
+x11vnc -once -display :0.0 -scale $scale > /tmp/x11vnc_port 2> /tmp/x11vnc_err &
 
 sleep 5s
 

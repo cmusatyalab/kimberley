@@ -30,6 +30,8 @@ launch_display_scripts(void *arg) {
 
   current_state.display_in_progress = 1;
 
+  remove("/tmp/x11vnc_port");
+
   err = system(command);
   if(err < 0) {
     perror("system");
@@ -55,8 +57,8 @@ int
 handle_dekimberlize_thread_setup() {
   int err, port, i;
   pthread_t tid;
-  FILE *fp;
-  char port_str[MAXPATHLEN];
+  FILE *fp = NULL;
+  char port_str[PATH_MAX];
 
 
   memset(&tid, 0, sizeof(pthread_t));
@@ -73,6 +75,8 @@ handle_dekimberlize_thread_setup() {
    * in /tmp/x11vnc_port.  dekimberlize is loading the vm in the background.
    */
 
+  fprintf(stderr, "\nWaiting for thin client server to come up..");
+
   port_str[0]='\0';
   do {
     struct timeval tv;
@@ -80,21 +84,17 @@ handle_dekimberlize_thread_setup() {
     int err;
 
     memset(&buf, 0, sizeof(struct stat));
+    memset(&tv, 0, sizeof(struct timeval));
 
     err = stat("/tmp/x11vnc_port", &buf);
-    if(err) {
-      if(err != ENOENT) { 
-	perror("stat"); 
-      }
-    }
-    else if(buf.st_size > 0) {
+    if(!err && buf.st_size > 0) {
+      fprintf(stderr, "(display-launcher) opened /tmp/x11vnc_port (size=%d)!\n"
+	      , buf.st_size);
       fp = fopen("/tmp/x11vnc_port", "r");
-      if(fp == NULL) { 
-	perror("fopen"); 
-      }
-      else { 
-	continue; 
-      }
+      if(fp != NULL)
+	break;
+      else
+      	perror("fopen"); 
     }
 
 
@@ -116,7 +116,7 @@ handle_dekimberlize_thread_setup() {
   fprintf(stderr, "(display-launcher) opened /tmp/x11vnc_port!\n");
 
   do {
-    char *str = fgets(port_str, MAXPATHLEN, fp);
+    char *str = fgets(port_str, PATH_MAX, fp);
     struct timeval tv;
     
     if(str == NULL) 
