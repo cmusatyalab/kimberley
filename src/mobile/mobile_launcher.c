@@ -524,10 +524,10 @@ main(int argc, char *argv[])
      * persistent state, if necessary.
      */
 
-    end_usage_1(0, &diff_filename, clnt);
-
     if(floppy_path != NULL) {
       char  diff_filename_local[PATH_MAX];
+      
+      end_usage_1(1, &diff_filename, clnt);
       
       snprintf(diff_filename_local, PATH_MAX, "/tmp/%s", diff_filename);
 
@@ -535,6 +535,9 @@ main(int argc, char *argv[])
 	fprintf(stderr, "(mobile-launcher) Couldn't retrieve '%s'\n",
 		diff_filename);
       }
+    }
+    else {
+      end_usage_1(0, &diff_filename, clnt);
     }
 
     xdr_free((xdrproc_t) xdr_wrapstring, (char *)&diff_filename);

@@ -88,8 +88,8 @@ handle_dekimberlize_thread_setup() {
 
     err = stat("/tmp/x11vnc_port", &buf);
     if(!err && buf.st_size > 0) {
-      fprintf(stderr, "(display-launcher) opened /tmp/x11vnc_port (size=%d)!\n"
-	      , buf.st_size);
+      fprintf(stderr, "(display-launcher) opened /tmp/x11vnc_port (size=%u)\n",
+	      (unsigned int) buf.st_size);
       fp = fopen("/tmp/x11vnc_port", "r");
       if(fp != NULL)
 	break;
@@ -417,16 +417,21 @@ bool_t
 end_usage_1_svc(int retrieve_state, char **result, struct svc_req *rqstp)
 {
   int fd, i, err;
+  char *filename;
 
   fd = open("/tmp/dekimberlize_finished", O_RDWR|O_CREAT);
   close(fd);
+
+  fprintf(stderr, "(display-launcher) (**result)=%p, (*result)=%p\n",
+	  result, *result);
 
   *result = (char *)malloc(PATH_MAX * sizeof(char));
   if(*result == NULL) {
     perror("malloc");
     return FALSE;
   }
-  result[0] = '\0';
+  filename=*result;
+  filename[0] = '\0';
 
   if(retrieve_state > 0) {
     int err;
@@ -437,9 +442,11 @@ end_usage_1_svc(int retrieve_state, char **result, struct svc_req *rqstp)
 	      "error: %d\n", err);
       return FALSE;
     }
+
+    fprintf(stderr, "(display-launcher) copying %s into returned filename.\n",
+	    current_state.persistent_state_diff_filename);
     
-    strncpy(*result, current_state.persistent_state_diff_filename, PATH_MAX);
-    *result[PATH_MAX-1]='\0';
+    strcpy(filename, current_state.persistent_state_diff_filename);
     
     err = pthread_mutex_unlock(&current_state.mutex);
     if(err < 0) {
@@ -449,8 +456,11 @@ end_usage_1_svc(int retrieve_state, char **result, struct svc_req *rqstp)
     }
   }
   else {
-    *result = NULL;
+    filename[0] = '\0';
   }
+
+  fprintf(stderr, "(display-launcher) client told to retrieve state: %s\n",
+	  *result);
 
   return TRUE;
 }
