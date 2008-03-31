@@ -382,7 +382,7 @@ retrieve_partial_1_svc(data *result,  struct svc_req *rqstp)
 
   memset((char *)result, 0, sizeof(data));
 
-  if((read_attachment == NULL) || (read_attachment_size <=0))
+  if((read_attachment == NULL) || (read_attachment_size <= 0))
     return FALSE;
 
   partial_read = (char *)malloc(CHUNK_SIZE);
@@ -391,9 +391,15 @@ retrieve_partial_1_svc(data *result,  struct svc_req *rqstp)
     return FALSE;
   }
 
-  bytes_read = fread(partial_read, CHUNK_SIZE, 1, read_attachment);
+  bytes_read = fread(partial_read, 1, CHUNK_SIZE, read_attachment);
   if(bytes_read <= 0) {
-    perror("fread");
+    if(feof(read_attachment)) {
+      fprintf(stderr, "(display-launcher) end of file retrieval\n");
+    }
+    if(ferror(read_attachment)) {
+      fprintf(stderr, "(display-launcher) error in file retrieval\n");
+      perror("fread");
+    }
     free(partial_read);
     return FALSE;
   }

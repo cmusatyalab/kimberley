@@ -319,6 +319,16 @@ main(int argc, char *argv[])
     case 'd':
       floppy_path = optarg;
       fprintf(stderr, "\tfloppy disk path:%s\n", floppy_path);
+
+      {
+	char command[ARG_MAX];
+
+	fprintf(stderr, "(mobile-launcher) unmounting floppy..\n");
+
+	snprintf(command, ARG_MAX, "umount %s", floppy_path);
+	system(command);
+      }
+
       break;
 
     default:
@@ -532,6 +542,8 @@ main(int argc, char *argv[])
       end_usage_1(1, &diff_filename, clnt);
       if(diff_filename != NULL) {
 	char *bname;
+	char command[ARG_MAX];
+	char floppy_sum_path[PATH_MAX];
 
 	bname = basename(diff_filename);
 	fprintf(stderr, "(mobile-launcher) server indicated persistent diff was %s\n", diff_filename);
@@ -543,6 +555,19 @@ main(int argc, char *argv[])
 	  fprintf(stderr, "(mobile-launcher) Couldn't retrieve '%s'\n",
 		  diff_filename);
 	}
+
+	fprintf(stderr, "(mobile-launcher) applying pers. state patch..\n");
+	snprintf(floppy_sum_path, PATH_MAX, "%s.new", floppy_path);
+	snprintf(command, ARG_MAX, "xdelta patch %s %s %s", 
+		 diff_filename_local, floppy_path, floppy_sum_path);
+	system(command);
+
+	remove(floppy_path);
+	rename(floppy_sum_path, floppy_path);
+
+	fprintf(stderr, "(mobile-launcher) remounting state image..\n");
+	snprintf(command, ARG_MAX, "mount %s", floppy_path);
+	system(command);
       }
       else {
 	fprintf(stderr, "(mobile-launcher) no persistent state path returned to retrieve!\n");
