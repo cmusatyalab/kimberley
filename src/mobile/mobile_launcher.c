@@ -517,7 +517,8 @@ main(int argc, char *argv[])
   
  cleanup:
   if(clnt != NULL) {
-    char  diff_filename[PATH_MAX];
+    char  *diff_filename = NULL;
+
 
     /*
      * Terminate remote dekimberlize process, retrieving modified
@@ -528,12 +529,19 @@ main(int argc, char *argv[])
       char  diff_filename_local[PATH_MAX];
       
       end_usage_1(1, &diff_filename, clnt);
-      
-      snprintf(diff_filename_local, PATH_MAX, "/tmp/%s", diff_filename);
+      if(diff_filename != NULL) {
+	fprintf(stderr, "(mobile-launcher) server indicated persistent diff was %s\n", diff_filename);
+	
+	diff_filename_local[0] = '\0';
+	snprintf(diff_filename_local, PATH_MAX, "/tmp/%s", diff_filename);
 
-      if(retrieve_file_in_pieces(diff_filename_local, clnt) < 0) {
-	fprintf(stderr, "(mobile-launcher) Couldn't retrieve '%s'\n",
-		diff_filename);
+	if(retrieve_file_in_pieces(diff_filename_local, clnt) < 0) {
+	  fprintf(stderr, "(mobile-launcher) Couldn't retrieve '%s'\n",
+		  diff_filename);
+	}
+      }
+      else {
+	fprintf(stderr, "(mobile-launcher) no persistent state path returned to retrieve!\n");
       }
     }
     else {

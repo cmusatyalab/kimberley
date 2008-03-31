@@ -344,6 +344,8 @@ retrieve_file_1_svc(char *filename, int *result, struct svc_req *rqstp)
   struct stat buf;
   int ret;
 
+  fprintf(stderr, "(display-launcher) client requested %s\n", filename);
+
   copy = strdup(filename);
   bname = basename(copy);
   snprintf(localname, PATH_MAX, "/tmp/%s", bname);
@@ -365,6 +367,8 @@ retrieve_file_1_svc(char *filename, int *result, struct svc_req *rqstp)
 
   *result = buf.st_size;
   read_attachment_size = buf.st_size;
+
+  fprintf(stderr, "(display-launcher) sending client file %s\n", localname);
 
   return TRUE;
 }
