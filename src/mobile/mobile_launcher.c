@@ -173,13 +173,14 @@ retrieve_file_in_pieces(char *path, CLIENT *clnt) {
   if((path == NULL) || (clnt == NULL))
     return -1;
 
-  fp = fopen(path, "w+");
+  fprintf(stderr, "(mobile-launcher) Retrieving file to path: %s\n", path);
+
+  fp = fopen(path, "w");
   if(fp == NULL) {
     perror("fopen");
     return -1;
   }
 
-  fprintf(stderr, "(mobile-launcher) Retrieving file to path: %s\n", path);
   retval = retrieve_file_1(path, &size, clnt);
   if(retval != RPC_SUCCESS) {
     clnt_perror (clnt, "retrieve_file RPC call failed");
@@ -530,10 +531,13 @@ main(int argc, char *argv[])
       
       end_usage_1(1, &diff_filename, clnt);
       if(diff_filename != NULL) {
+	char *bname;
+
+	bname = basename(diff_filename);
 	fprintf(stderr, "(mobile-launcher) server indicated persistent diff was %s\n", diff_filename);
 	
 	diff_filename_local[0] = '\0';
-	snprintf(diff_filename_local, PATH_MAX, "/tmp/%s", diff_filename);
+	snprintf(diff_filename_local, PATH_MAX, "/tmp/%s", bname);
 
 	if(retrieve_file_in_pieces(diff_filename_local, clnt) < 0) {
 	  fprintf(stderr, "(mobile-launcher) Couldn't retrieve '%s'\n",
