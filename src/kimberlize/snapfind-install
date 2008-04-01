@@ -25,9 +25,9 @@ mkdir -p ~/.diamond/
 wget -O ~/.diamond/name_map http://solitaire.diamond.cs.cmu.edu/snapfind_name_map
 wget -O ~/.diamond/gid_map http://solitaire.diamond.cs.cmu.edu/snapfind_gid_map
 
-echo "DATAROOT /home/diamond/" > ~/.diamond/diamond_config
-echo "INDEXDIR /home/diamond/" >> ~/.diamond/diamond_config
-echo "CACHEDIR /home/diamond/" >> ~/.diamond/diamond_config
+echo "DATAROOT $HOME" > ~/.diamond/diamond_config
+echo "INDEXDIR $HOME" >> ~/.diamond/diamond_config
+echo "CACHEDIR $HOME" >> ~/.diamond/diamond_config
 echo "DATATYPE NATIVE" >> ~/.diamond/diamond_config
 
 
@@ -37,15 +37,3 @@ echo "DATATYPE NATIVE" >> ~/.diamond/diamond_config
 
 mkdir -p ~/.diamond/snapfind/
 echo "PLUGIN_DIR      /usr/local/diamond/lib" > ~/.diamond/snapfind/snapfindrc
-
-
-########################################################################
-# Cleanup
-#
-
-sudo apt-get clean
-rm -f /tmp/*.deb
-sudo rm -f /var/cache/apt/partial/*
-sudo rm -f /var/lib/apt/lists/*_Packages
-sudo rm -f /var/lib/apt/lists/*_Sources
-sudo rm -f /var/lib/apt/lists/*_Release
