@@ -1,11 +1,74 @@
 #!/bin/sh
 
+########################################################################
+# kimberlize
+#
+# A script that customizes a virtual machine with an application and
+# determines the delta in VM state resulting from the customization.
+#
+
+
+
+########################################################################
+# Functions to simplify code.
+#
+
+
+#
+## Print the command's syntax.
+#
+
 usage()
 {
 	echo \
 	usage: `basename $0` [-l login-name] [-p port] [-n] \
 \<vm-name\> \<app-name\> 
 }
+
+
+#
+## Check whether a virtual machine is running.
+##   $1: The vm's name or UUID
+##   $?: 1 if running, 0 if not
+#
+
+vm_running()
+{
+    uuid=`VBoxManage showvminfo $1 | grep UUID | head -1 | sed -e 's/ //g' | cut
+ -f2 -d':'`
+    running=`VBoxManage list runningvms | grep $uuid`
+
+    if [ "$uuid" = "$running" ]; then
+        return 1
+    fi
+
+    return 0
+}
+
+
+#
+## Poll VirtualBox about a VM until it is running.
+##   $1: The vm's name or UUID
+##   $2: The number of seconds until timeout
+##   $?: 1 if running, 0 if not
+#
+
+sleep_until_vm_running()
+{
+    for ((i=0;i<$2;i+=1)); do
+        vm_running $1
+        vm_status=$?
+
+        if [ $vm_status -eq 1 ]; then
+            return 1
+        fi
+        sleep 1s
+    done
+
+    return 0
+}
+
+
 
 if [ $# -lt 2 ]; then
 	usage
@@ -88,8 +151,14 @@ if [ $? -ne 0 ]; then
 	echo `basename $0`: error: failed resuming VM
     exit 1
 fi
-echo "Resume in progess.  Sleeping 30s while the VM loads and DHCPs.."
-sleep 30s
+
+echo
+echo "Resuming.."
+sleep_until_vm_running $1 300
+
+echo
+echo "Sleeping 10 secs while the VM gets a network address.."
+sleep 10s
 
 
 ########################################################################
