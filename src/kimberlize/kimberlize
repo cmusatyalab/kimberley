@@ -270,15 +270,6 @@ tar cf /tmp/${vm_name}-app_state.tar -C /tmp $vm_name
 ls -lR /tmp/$vm_name
 rm -rf /tmp/$vm_name
 
-if [ $compression -eq 1 ]; then
-	echo
-	echo "Compressing.."
-	lzma /tmp/${vm_name}-app_state.tar
-else
-	echo
-	echo "Compression disabled, ignoring.."
-fi
-
 
 ########################################################################
 # Now clean up, deleting the unnecessary checkpoint and removing
@@ -295,6 +286,18 @@ fi
 VBoxManage setextradata $vm_name "VBoxInternal/Devices/pcnet/0/LUN#0/Config/diamond_ssh/HostPort" > /dev/null
 VBoxManage setextradata $vm_name "VBoxInternal/Devices/pcnet/0/LUN#0/Config/diamond_ssh/GuestPort" > /dev/null
 VBoxManage setextradata $vm_name "VBoxInternal/Devices/pcnet/0/LUN#0/Config/diamond_ssh/Protocol" > /dev/null
+
+echo
+echo "VM returned to base state."
+
+if [ $compression -eq 1 ]; then
+	echo
+	echo "Compressing kimberlize patch.."
+	lzma /tmp/${vm_name}-app_state.tar
+else
+	echo
+	echo "Compression disabled, ignoring.."
+fi
 
 
 echo
