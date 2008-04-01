@@ -22,7 +22,7 @@ usage()
 {
 	echo \
 	usage: `basename $0` [-l login-name] [-p port] [-n] \
-\<vm-name\> \<app-name\> 
+\<vm-name\> \<install-script\> \<execute-script\> 
 }
 
 
@@ -34,8 +34,7 @@ usage()
 
 vm_running()
 {
-    uuid=`VBoxManage showvminfo $1 | grep UUID | head -1 | sed -e 's/ //g' | cut
- -f2 -d':'`
+    uuid=`VBoxManage showvminfo $1 | grep UUID | head -1 | sed -e 's/ //g' | cut -f2 -d':'`
     running=`VBoxManage list runningvms | grep $uuid`
 
     if [ "$uuid" = "$running" ]; then
@@ -70,16 +69,18 @@ sleep_until_vm_running()
 
 
 
-if [ $# -lt 2 ]; then
+if [ $# -lt 3 ]; then
 	usage
 	exit 1
 fi
 
-snapshot_name="diamond_app"
-login_name="diamond"
+snapshot_name="base"
+login_name="kimberley"
 login_port=2222
 compression=1
 homedir=`printenv HOME`
+install_script=""
+execute_script=""
 
 while getopts ":l:np:h" Option
 do
@@ -108,9 +109,31 @@ do
 done
 shift $(($OPTIND-1))
 
+vm_name=$1
+install_script=$2
+execute_script=$3
+
+if [ "$vm_name" = "" ]; then
+	echo "error: No VM name supplied."
+    usage
+    exit 1
+fi
+
+if [ "$install_script" = "" ]; then
+	echo "error: No application installation script supplied."
+    usage
+    exit 1
+fi
+
+if [ "$execute_script" = "" ]; then
+	echo "error: No application execution script supplied."
+    usage
+    exit 1
+fi
+
 
 echo
-echo "Installing application '$2' in VM '$1'.."
+echo "Installing application in VM '$vm_name'.."
 
 
 ########################################################################
@@ -119,9 +142,9 @@ echo "Installing application '$2' in VM '$1'.."
 
 echo 
 echo "Port forwarding (host:$login_port -> guest:22) for SSH.."
-VBoxManage setextradata $1 "VBoxInternal/Devices/pcnet/0/LUN#0/Config/diamond_ssh/HostPort" $login_port > /dev/null
-VBoxManage setextradata $1 "VBoxInternal/Devices/pcnet/0/LUN#0/Config/diamond_ssh/GuestPort" 22 > /dev/null
-VBoxManage setextradata $1 "VBoxInternal/Devices/pcnet/0/LUN#0/Config/diamond_ssh/Protocol" TCP > /dev/null
+VBoxManage setextradata $vm_name "VBoxInternal/Devices/pcnet/0/LUN#0/Config/diamond_ssh/HostPort" $login_port > /dev/null
+VBoxManage setextradata $vm_name "VBoxInternal/Devices/pcnet/0/LUN#0/Config/diamond_ssh/GuestPort" 22 > /dev/null
+VBoxManage setextradata $vm_name "VBoxInternal/Devices/pcnet/0/LUN#0/Config/diamond_ssh/Protocol" TCP > /dev/null
 
 
 ########################################################################
@@ -131,8 +154,8 @@ VBoxManage setextradata $1 "VBoxInternal/Devices/pcnet/0/LUN#0/Config/diamond_ss
 #
 
 echo
-echo "Snapshotting VM '$1'.."
-VBoxManage snapshot $1 take $snapshot_name > /dev/null
+echo "Snapshotting VM '$vm_name'.."
+VBoxManage snapshot $vm_name take $snapshot_name > /dev/null
 if [ $? -ne 0 ]; then
 	echo `basename $0`: error: failed taking VM snapshot
     exit 1
@@ -144,8 +167,8 @@ fi
 #
 
 echo
-echo "Resuming VM '$1'.."
-VBoxManage startvm $1 > /dev/null
+echo "Resuming VM '$vm_name'.."
+VBoxManage startvm $vm_name > /dev/null
 #-type vrdp
 if [ $? -ne 0 ]; then
 	echo `basename $0`: error: failed resuming VM
@@ -154,11 +177,11 @@ fi
 
 echo
 echo "Resuming.."
-sleep_until_vm_running $1 300
+sleep_until_vm_running $vm_name 300
 
 echo
-echo "Sleeping 10 secs while the VM gets a network address.."
-sleep 10s
+echo "Sleeping 15 secs while the VM gets a network address.."
+sleep 15s
 
 
 ########################################################################
@@ -166,18 +189,19 @@ sleep 10s
 #
 
 echo
-echo "Executing install script '$2-install' inside VM.."
-scp -P $login_port $2-install $login_name@localhost:/tmp
-ssh -t -l $login_name -p $login_port localhost /tmp/$2-install
+echo "Executing install script '$install_script' inside VM.."
+scp -P $login_port $install_script $login_name@localhost:/tmp
+ssh -t -l $login_name -p $login_port localhost /tmp/$install_script
 
 echo
-echo "Executing application script '$2-execute' inside VM.."
-scp -P $login_port $2-execute $login_name@localhost:/tmp
-ssh -f -l $login_name -p $login_port localhost /tmp/$2-execute
+echo "Executing application script '$execute_script' inside VM.."
+scp -P $login_port $execute_script $login_name@localhost:/tmp
+ssh -f -l $login_name -p $login_port localhost /tmp/$execute_script
 sleep 5s
 
 
 ########################################################################
+# XXX EXPERIMENTAL
 # Execute zerofree, which cleans freed blocks, increasing compressibility.
 # This is turned off for now due to the fact that zerofree needs to
 # change runlevels, which may trash memory state.
@@ -199,8 +223,8 @@ fi
 #
 
 echo
-echo "Suspending VM $1 (saving state).."
-VBoxManage controlvm $1 savestate > /dev/null
+echo "Suspending VM $vm_name (saving state).."
+VBoxManage controlvm $vm_name savestate > /dev/null
 if [ $? -ne 0 ]; then
     echo `basename $0`: error: failed suspending VM state
     exit 1
@@ -211,14 +235,14 @@ fi
 # Parse the various UUIDs used in filename construction.
 #
 
-mem_snapshot_uuid=`cat $homedir/.VirtualBox/Machines/$1/$1.xml | grep currentSnapshot | cut -f4 -d'"' | sed -e 's/{//g' | sed -e 's/}//g'`
-mem_snapshot_file="$homedir/.VirtualBox/Machines/$1/Snapshots/{${mem_snapshot_uuid}}.sav"
+mem_snapshot_uuid=`cat $homedir/.VirtualBox/Machines/$vm_name/$vm_name.xml | grep currentSnapshot | cut -f4 -d'"' | sed -e 's/{//g' | sed -e 's/}//g'`
+mem_snapshot_file="$homedir/.VirtualBox/Machines/$vm_name/Snapshots/{${mem_snapshot_uuid}}.sav"
 
-mem_current_uuid=`cat $homedir/.VirtualBox/Machines/$1/$1.xml | grep stateFile | head -1 | cut -f12 -d'"' | cut -f2 -d'{' | cut -f1 -d'}'` 
-mem_current_file="$homedir/.VirtualBox/Machines/$1/Snapshots/{${mem_current_uuid}}.sav"
+mem_current_uuid=`cat $homedir/.VirtualBox/Machines/$vm_name/$vm_name.xml | grep stateFile | head -1 | cut -f12 -d'"' | cut -f2 -d'{' | cut -f1 -d'}'` 
+mem_current_file="$homedir/.VirtualBox/Machines/$vm_name/Snapshots/{${mem_current_uuid}}.sav"
 
-disk_current_uuid=`cat $homedir/.VirtualBox/Machines/$1/$1.xml | grep hardDisk | tail -1 | cut -f6 -d'"' | sed -e 's/{//g' | sed -e 's/}//g'`
-disk_current_file="$homedir/.VirtualBox/Machines/$1/Snapshots/{${disk_current_uuid}}.vdi"
+disk_current_uuid=`cat $homedir/.VirtualBox/Machines/$vm_name/$vm_name.xml | grep hardDisk | tail -1 | cut -f6 -d'"' | sed -e 's/{//g' | sed -e 's/}//g'`
+disk_current_file="$homedir/.VirtualBox/Machines/$vm_name/Snapshots/{${disk_current_uuid}}.vdi"
 
 
 ########################################################################
@@ -227,22 +251,22 @@ disk_current_file="$homedir/.VirtualBox/Machines/$1/Snapshots/{${disk_current_uu
 # This can vastly reduce the amount of memory transferred.
 #
 
-rm -rf /tmp/$1/
-mkdir -p /tmp/$1/Snapshots/
+rm -rf /tmp/$vm_name/
+mkdir -p /tmp/$vm_name/Snapshots/
 
 echo
 echo "Taking the delta between current in-memory state and the checkpoint's.."
-xdelta delta $mem_snapshot_file $mem_current_file /tmp/$1/Snapshots/${mem_snapshot_uuid}.diff
+xdelta delta $mem_snapshot_file $mem_current_file /tmp/$vm_name/Snapshots/${mem_snapshot_uuid}.diff
 
 echo
 echo "Taking the delta between current disk image and the checkpoint's.."
-#scp $disk_current_file /tmp/$1/Snapshots/
-scp $homedir/.VirtualBox/Machines/$1/Snapshots/*.vdi /tmp/$1/Snapshots/
-scp $homedir/.VirtualBox/Machines/$1/$1.xml /tmp/$1/$1.xml
-scp $homedir/.VirtualBox/VirtualBox.xml /tmp/$1/VirtualBox.xml
-tar cf $2-app_state.tar -C /tmp $1
-ls -lR /tmp/$1
-rm -rf /tmp/$1
+#scp $disk_current_file /tmp/$vm_name/Snapshots/
+scp $homedir/.VirtualBox/Machines/$vm_name/Snapshots/*.vdi /tmp/$vm_name/Snapshots/
+scp $homedir/.VirtualBox/Machines/$vm_name/$vm_name.xml /tmp/$vm_name/$vm_name.xml
+scp $homedir/.VirtualBox/VirtualBox.xml /tmp/$vm_name/VirtualBox.xml
+tar cf $2-app_state.tar -C /tmp $vm_name
+ls -lR /tmp/$vm_name
+rm -rf /tmp/$vm_name
 
 if [ $compression -eq 1 ]; then
 	echo
@@ -260,19 +284,19 @@ fi
 #
 
 echo
-echo "Discarding new state of VM '$1' and reverting to the checkpoint.."
-VBoxManage snapshot $1 discardcurrent -all > /dev/null
+echo "Discarding new state of VM '$vm_name' and reverting to the checkpoint.."
+VBoxManage snapshot $vm_name discardcurrent -all > /dev/null
 if [ $? -ne 0 ]; then
     echo `basename $0`: error: failed discarding VM snapshot '$snapshot_name' 
 fi
 
-VBoxManage setextradata $1 "VBoxInternal/Devices/pcnet/0/LUN#0/Config/diamond_ssh/HostPort" > /dev/null
-VBoxManage setextradata $1 "VBoxInternal/Devices/pcnet/0/LUN#0/Config/diamond_ssh/GuestPort" > /dev/null
-VBoxManage setextradata $1 "VBoxInternal/Devices/pcnet/0/LUN#0/Config/diamond_ssh/Protocol" > /dev/null
+VBoxManage setextradata $vm_name "VBoxInternal/Devices/pcnet/0/LUN#0/Config/diamond_ssh/HostPort" > /dev/null
+VBoxManage setextradata $vm_name "VBoxInternal/Devices/pcnet/0/LUN#0/Config/diamond_ssh/GuestPort" > /dev/null
+VBoxManage setextradata $vm_name "VBoxInternal/Devices/pcnet/0/LUN#0/Config/diamond_ssh/Protocol" > /dev/null
 
 
 echo
-echo -n "Complete!  Your state is in the file '$2-app_state.tar"
+echo -n "Complete!  Your state is in the file '${vm_name}-app_state.tar"
 if [ $compression -eq 1 ]; then
 	echo ".lzma'"
 else
