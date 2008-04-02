@@ -58,6 +58,15 @@ determine_rtt(CLIENT *clnt) {
   struct timeval tv_before, tv_after;
   int ret, i;
 
+  if(clnt == NULL)
+    return (float) -1;
+
+  retval = ping_1((void *)NULL, clnt);
+  if(retval != RPC_SUCCESS) {
+    fprintf(stderr, "(mobile-launcher) ping failed!\n");
+    return (float) -1;
+  }
+
   for(i=0; i<10; i++) {  //perform 10 RPC pings
 
     memset(&tv_before, 0, sizeof(struct timeval));
