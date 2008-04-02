@@ -306,7 +306,7 @@ echo "VM returned to base state."
 if [ $compression -eq 1 ]; then
     echo
     echo "Compressing VM overlay (LZMA).."
-    lzcat $overlay_filename > ${overlay_filename}.lzma
+    lzcat -z $overlay_filename > ${overlay_filename}.lzma
     rm $overlay_filename
     overlay_filename=${overlay_filename}.lzma
 else

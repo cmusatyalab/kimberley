@@ -256,8 +256,10 @@ echo "Checking for compression.."
 compressed=`echo $overlay_file | grep lzma`
 if [ "$compressed" != "" ]; then
     echo "Decompressing.."
-    unlzma $overlay_file
-    overlay_file=`echo $overlay_file | sed 's/.lzma//g'`
+    target_file=`echo $overlay_file | sed 's/.lzma//g'`
+    lzcat -d $overlay_file > $target_file
+    rm $target_file
+    overlay_file=$target_file
     echo " - Created decompressed VM overlay file: $overlay_file"
 fi
 
