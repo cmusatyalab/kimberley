@@ -501,6 +501,11 @@ main(int argc, char *argv[])
     }
   }
 
+
+  /*
+   * Transfer the VM overlay to the display.
+   */
+
   switch(vmt) {
 
   case VM_FILE:

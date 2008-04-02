@@ -20,8 +20,8 @@
 
 usage()
 {
-	echo "usage: kimberlize [-e [-k encryption-key-file]] [-l login-name] [-p port] [-n]"
-	echo "                  <vm-name\> \<install-script\> \<execute-script\> 
+    echo "usage: kimberlize [-e [-k encryption-key-file]] [-l login-name] [-p port] [-n]"
+    echo "                    <vm-name> <install-script> <execute-script>"
 }
 
 
@@ -306,7 +306,8 @@ echo "VM returned to base state."
 if [ $compression -eq 1 ]; then
     echo
     echo "Compressing VM overlay (LZMA).."
-    lzma $overlay_filename
+    lzcat $overlay_filename > ${overlay_filename}.lzma
+    rm $overlay_filename
     overlay_filename=${overlay_filename}.lzma
 else
     echo
