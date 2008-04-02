@@ -154,7 +154,7 @@ do
  
       f)
 
-        if [ "$overlay_file" != ""]; then
+        if [ "$overlay_file" != "" ]; then
             echo
             echo "Please specify only one VM overlay input method!"
             exit 1
@@ -168,7 +168,7 @@ do
         
       i)
 
-        if [ "$overlay_file" != ""]; then
+        if [ "$overlay_file" != "" ]; then
             echo
             echo "Please specify only one VM overlay input method!"
             exit 1
