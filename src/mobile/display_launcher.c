@@ -43,8 +43,13 @@ cleanup(void) {
     fprintf(stderr, "(display-launcher) pthread_mutex_lock returned "
 	    "error: %d\n", err);
 
-  if(strlen(current_state.overlay_filename) > 0)
-    if(remove(current_state.overlay_filename) < 0)
+  if(strlen(current_state.overlay_location) > 0)
+    if(remove(current_state.overlay_location) < 0)
+      if(errno != ENOENT)
+	perror("remove");
+
+  if(strlen(current_state.encryption_key_filename) > 0)
+    if(remove(current_state.encryption_key_filename) < 0)
       if(errno != ENOENT)
 	perror("remove");
 
@@ -63,7 +68,8 @@ cleanup(void) {
       if(errno != ENOENT)
 	perror("remove");
 
-  current_state.overlay_filename[0]='\0';
+  current_state.overlay_location[0]='\0';
+  current_state.encryption_key_filename[0]='\0';
   current_state.persistent_state_filename[0]='\0';
   current_state.persistent_state_modified_filename[0]='\0';
   current_state.persistent_state_diff_filename[0]='\0';

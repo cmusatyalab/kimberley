@@ -98,8 +98,6 @@ handle_dekimberlize_thread_setup() {
     }
 
 
-  sleep:
-
     /*
      * Sleep a second, waiting for our thin client server to come up.
      */
@@ -185,6 +183,8 @@ load_vm_from_path_1_svc(char *vm_name, char *patch_path, int *result, struct svc
 bool_t
 load_vm_from_url_1_svc(char *vm_name, char *patch_URL, int *result,  struct svc_req *rqstp)
 {
+  int err;
+  char arg[PATH_MAX];
     
   if((vm_name == NULL) || (patch_URL == NULL) || (result == NULL)) {
     fprintf(stderr, "(display-launcher) Bad args to vm_path!\n");
@@ -196,7 +196,42 @@ load_vm_from_url_1_svc(char *vm_name, char *patch_URL, int *result,  struct svc_
   fprintf(stderr, "(display-launcher) Preparing new VNC display with "
 	  "vm '%s', kimberlize patch '%s'..\n", vm_name, patch_URL);
 
-  snprintf(command, ARG_MAX, "display_setup -i %s %s", patch_URL, vm_name);
+  err = pthread_mutex_lock(&current_state.mutex);
+  if(err < 0) {
+    fprintf(stderr, "(display-launcher) pthread_mutex_lock returned "
+	    "error: %d\n", err);
+    *result = -1;
+    return FALSE;
+  }
+
+  strncpy(current_state.overlay_location, patch_URL, 2048);
+  current_state.overlay_location[PATH_MAX-1] = '\0';
+
+  strncpy(current_state.vm_name, vm_name, PATH_MAX);
+  current_state.vm_name[PATH_MAX-1] = '\0';
+
+  err = pthread_mutex_unlock(&current_state.mutex);
+  if(err < 0) {
+    fprintf(stderr, "(display-launcher) pthread_mutex_unlock returned "
+	    "error: %d\n", err);
+    *result = -1;
+    return FALSE;
+  }
+
+  snprintf(command, ARG_MAX, "display_setup ");
+
+  if(strlen(current_state.persistent_state_filename) > 0) {
+    snprintf(arg, PATH_MAX, "-a %s ", current_state.persistent_state_filename);
+    strncat(command, arg, PATH_MAX);
+  }
+
+  if(strlen(current_state.encryption_key_filename) > 0) {
+    snprintf(arg, PATH_MAX, "-d %s ", current_state.encryption_key_filename);
+    strncat(command, arg, PATH_MAX);
+  }
+  
+  snprintf(arg, PATH_MAX, "-i %s ", current_state.overlay_location);
+  strncat(command, arg, PATH_MAX);
 
   *result = handle_dekimberlize_thread_setup();
 
@@ -209,9 +244,10 @@ bool_t
 load_vm_from_attachment_1_svc(char *vm_name, char *patch_file, int *result,  struct svc_req *rqstp)
 {
   int err;
-  char patch_path[PATH_MAX], *bname, *copy;
+  char *bname, *copy;
+  char arg[PATH_MAX];
   
-  if((vm_name == NULL) || (patch_path == NULL) || (result == NULL)) {
+  if((vm_name == NULL) || (patch_file == NULL) || (result == NULL)) {
     fprintf(stderr, "(display-launcher) Bad args to vm_path!\n");
     *result = -1;
     return FALSE;
@@ -232,7 +268,9 @@ load_vm_from_attachment_1_svc(char *vm_name, char *patch_file, int *result,  str
     return FALSE;
   }
 
-  snprintf(current_state.overlay_filename, PATH_MAX, "/tmp/%s", bname);
+  snprintf(current_state.overlay_location, PATH_MAX, "/tmp/%s", bname);
+  strncpy(current_state.vm_name, vm_name, PATH_MAX);
+  current_state.vm_name[PATH_MAX-1] = '\0';
 
   err = pthread_mutex_unlock(&current_state.mutex);
   if(err < 0) {
@@ -243,14 +281,23 @@ load_vm_from_attachment_1_svc(char *vm_name, char *patch_file, int *result,  str
     return FALSE;
   }
 
-  if(strlen(current_state.persistent_state_filename) > 0)
-    snprintf(command, ARG_MAX, "display_setup -d %s -f %s %s",
-	     current_state.persistent_state_filename, 
-	     current_state.overlay_filename,
-	     vm_name);
-  else
-    snprintf(command, ARG_MAX, "display_setup -f %s %s", 
-	     current_state.overlay_filename, vm_name);
+  snprintf(command, ARG_MAX, "display_setup ");
+
+  if(strlen(current_state.persistent_state_filename) > 0) {
+    snprintf(arg, PATH_MAX, "-a %s ", current_state.persistent_state_filename);
+    strncat(command, arg, PATH_MAX);
+  }
+
+  if(strlen(current_state.encryption_key_filename) > 0) {
+    snprintf(arg, PATH_MAX, "-d %s ", current_state.encryption_key_filename);
+    strncat(command, arg, PATH_MAX);
+  }
+  
+  snprintf(arg, PATH_MAX, "-f %s ", current_state.overlay_location);
+  strncat(command, arg, PATH_MAX);
+
+
+  strncat(command, vm_name, PATH_MAX);
 
   free(copy);
 
@@ -538,6 +585,53 @@ use_persistent_state_1_svc(char *filename, int *result,  struct svc_req *rqstp)
 	  current_state.persistent_state_filename,
 	  current_state.persistent_state_modified_filename,
 	  current_state.persistent_state_diff_filename);
+
+  free(copy);
+  *result = 0;
+
+  return TRUE;
+}
+
+
+/*
+ * This call specifies that a persistent state is ready to be
+ * shipped over the wire, that will be attached to a running
+ * virtual machine by the Dekimberlize process.  The system
+ * then expects the next file to be sent to be this.
+ */
+
+bool_t
+use_encryption_key_1_svc(char *filename, int *result,  struct svc_req *rqstp)
+{
+  int err;
+  char *bname, *copy;
+
+  copy = strdup(filename);
+  bname = basename(copy);
+
+  err = pthread_mutex_lock(&current_state.mutex);
+  if(err < 0) {
+    fprintf(stderr, "(display-launcher) pthread_mutex_lock returned "
+	    "error: %d\n", err);
+    free(copy);
+    *result = -1;
+    return FALSE;
+  }
+  
+  snprintf(current_state.encryption_key_filename, PATH_MAX, 
+	   "/tmp/%s", bname);
+
+  err = pthread_mutex_unlock(&current_state.mutex);
+  if(err < 0) {
+    fprintf(stderr, "(display-launcher) pthread_mutex_unlock returned "
+	    "error: %d\n", err);
+    *result = -1;
+    free(copy);
+    return FALSE;
+  }
+
+  fprintf(stderr, "(display-launcher) Using encryption key: %s\n",
+	  current_state.encryption_key_filename);
 
   free(copy);
   *result = 0;

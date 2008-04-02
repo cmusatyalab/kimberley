@@ -38,17 +38,24 @@ program MOBILELAUNCHER_PROG {
     
     
     /*
-     * Calls to support floppy disk persistent state.
+     * Call to indicate filename of floppy disk persistent state.
      */
     
     int     use_persistent_state(string filename<1024>) = 10;
 
     
     /*
-     * Calls to indicate a change in user status.
+     * Call to indicate filename of decryption key.
      */
     
-    string  end_usage(int retrieve_state) = 11;
+    int     use_encryption_key(string filename<1024>) = 11;
+
+    
+    /*
+     * Call to indicate the end of user interaction.
+     */
+    
+    string  end_usage(int retrieve_state) = 12;
 
   } = 1;
 } = 0x2A2ADEBF;  /* The leading "0x2" is required for "static"

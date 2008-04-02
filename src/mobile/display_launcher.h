@@ -4,7 +4,9 @@
 typedef struct {
   pthread_mutex_t mutex;
   int display_in_progress;
-  char overlay_filename[PATH_MAX];
+  char vm_name[PATH_MAX];
+  char overlay_location[PATH_MAX];
+  char encryption_key_filename[PATH_MAX];
   char persistent_state_filename[PATH_MAX];
   char persistent_state_modified_filename[PATH_MAX];
   char persistent_state_diff_filename[PATH_MAX];

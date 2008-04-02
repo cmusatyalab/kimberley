@@ -273,7 +273,11 @@ main(int argc, char *argv[])
   struct addrinfo *info = NULL, hints;
   enum clnt_stat retval;
   enum vm_type vmt = VM_UNKNOWN;
-  char *overlay_path = "", *vm, *floppy_path = "";
+
+  char *vm;
+  char *overlay_path = NULL;
+  char *floppy_path = NULL;
+  char *encryption_key_path = NULL;
   
   int connfd = 0; 
   CLIENT *clnt = NULL;
@@ -292,9 +296,29 @@ main(int argc, char *argv[])
 
   fprintf(stderr, "(mobile-launcher) starting up..\n");
   
-  while((opt = getopt(argc, argv, "f:i:d:")) != -1) {
+  while((opt = getopt(argc, argv, "a:d:f:i:")) != -1) {
 
     switch(opt) {
+
+    case 'a':
+      floppy_path = optarg;
+      fprintf(stderr, "\tfloppy disk file:%s\n", floppy_path);
+
+      {
+	char command[ARG_MAX];
+
+	fprintf(stderr, "(mobile-launcher) unmounting floppy..\n");
+
+	snprintf(command, ARG_MAX, "umount %s", floppy_path);
+	system(command);
+      }
+
+      break;
+
+    case 'd':
+      encryption_key_path = optarg;
+      fprintf(stderr, "\tencryption key file:%s\n", encryption_key_path);
+      break;
 
     case 'f':
       if(vmt != VM_UNKNOWN) {
@@ -316,21 +340,6 @@ main(int argc, char *argv[])
       fprintf(stderr, "\toverlay URL:%s\n", overlay_path);
       break;
       
-    case 'd':
-      floppy_path = optarg;
-      fprintf(stderr, "\tfloppy disk path:%s\n", floppy_path);
-
-      {
-	char command[ARG_MAX];
-
-	fprintf(stderr, "(mobile-launcher) unmounting floppy..\n");
-
-	snprintf(command, ARG_MAX, "umount %s", floppy_path);
-	system(command);
-      }
-
-      break;
-
     default:
       usage(argv[0]);
       exit(EXIT_FAILURE);
@@ -447,19 +456,47 @@ main(int argc, char *argv[])
   }
 
 
+  /*
+   * Send a floppy disk filesystem image to be attached to a running
+   * virtual machine.
+   */
+
   if(floppy_path != NULL) {
     fprintf(stderr, "(mobile-launcher) Sending floppy disk image..\n");
     
     if(send_file_in_pieces(floppy_path, clnt) < 0) {
-      fprintf(stderr, "(mobile-launcher) failed sending floppy disk image\n");
+      fprintf(stderr, "(mobile-launcher) failed sending floppy disk image file\n");
       floppy_path = NULL;
     }
     else {
       retval = use_persistent_state_1(floppy_path, &err, clnt);
       if (retval != RPC_SUCCESS) {
 	fprintf(stderr, "(mobile-launcher) setting persistent state file "
-		"failed: %s", clnt_sperrno(retval));
+		"failed: %s\n", clnt_sperrno(retval));
 	floppy_path = NULL;
+      }
+    }
+  }
+
+
+  /*
+   * Send an encryption key capable of decoding the virtual machine overlay.
+   */
+
+  if(encryption_key_path != NULL) {
+    fprintf(stderr, "(mobile-launcher) Sending encryption key..\n");
+    
+    if(send_file_in_pieces(encryption_key_path, clnt) < 0) {
+      fprintf(stderr, "(mobile-launcher) failed sending encryption key file\n");
+      floppy_path = NULL;
+    }
+    else {
+      retval = use_encryption_key_1(encryption_key_path, &err, clnt);
+      if (retval != RPC_SUCCESS) {
+	fprintf(stderr, "(mobile-launcher) setting encryption key file "
+		"failed: %s\n", clnt_sperrno(retval));
+	encryption_key_path = NULL;
+	goto cleanup;
       }
     }
   }
