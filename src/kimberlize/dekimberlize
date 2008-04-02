@@ -122,48 +122,76 @@ homedir=`printenv HOME`
 floppy_original=""
 floppy_copy=""
 floppy_diff=""
-
+overlay_file=""
+decryption_keyfile=""
 
 ########################################################################
 # Process command-line options.
 #
 
-while getopts ":d:f:i:h" Option
+while getopts ":a:d:f:i:h" Option
 do
   case $Option in
 
-      d)
-    floppy_original=$OPTARG
-    floppy_copy="${OPTARG}.new"
-    floppy_diff="${OPTARG}.diff"
+      a)
 
-    echo
-    echo "Received floppy disk image file '$floppy_original'.."
-    ;;
+        floppy_original=$OPTARG
+        floppy_copy="${OPTARG}.new"
+        floppy_diff="${OPTARG}.diff"
+
+        echo
+        echo "PARAM: floppy disk image file '$floppy_original'.."
+        ;;
+
     
-      f)
-    patch_file=$OPTARG
-    echo
-    echo "Using kimberlize patch file '$patch_file'.."
-    ;;
+      d)
 
+        decryption_keyfile=$OPTARG
+        echo
+        echo "PARAM: decryption key in file '$decryption_keyfile'.."
+        ;;
+        
+ 
+      f)
+
+        if [ "$overlay_file" != ""]; then
+            echo
+            echo "Please specify only one VM overlay input method!"
+            exit 1
+        fi
+        
+        overlay_file=$OPTARG
+        echo
+        echo "PARAM: VM overlay file '$overlay_file'.."
+        ;;
+        
+        
       i)
-    patch_file=`basename $OPTARG`
-    echo
-    echo "Downloading and using kimberlize patch file '$patch_file'.."
-    wget -O /tmp/$patch_file $OPTARG
-    patch_file=/tmp/$patch_file
-    ;;
+
+        if [ "$overlay_file" != ""]; then
+            echo
+            echo "Please specify only one VM overlay input method!"
+            exit 1
+        fi
+        
+        overlay_file=`basename $OPTARG`
+        echo
+        echo "PARAM: VM overlay URL '$overlay_file'.."
+        wget -O /tmp/$overlay_file $OPTARG
+        overlay_file=/tmp/$overlay_file
+        ;;
+
 
       h)
-    usage
-    exit 0
-    ;;
+        usage
+        exit 0
+        ;;
+
 	    
       ?)
-    usage
-    exit 1
-    ;;
+        usage
+        exit 1
+        ;;
 
     esac
 done
@@ -209,21 +237,30 @@ rm -f /tmp/dekimberlize_finished
 
 
 ########################################################################
-# Apply kimberlized tarball to the specified VM, decompressing
-# first if necessary.
+# Apply kimberlized tarball to the specified VM,
+# decrypting and decompressing first if necessary.
 #
+
+if [ "$decryption_keyfile" != "" ]; then
+    echo "Decrypting.."
+    output_file=`echo $overlay_file | sed 's/.enc//g'`
+    openssl enc -aes-128-cbc -d -pass file:$decryption_keyfile -in $overlay_file -out $output_file
+    rm $overlay_file
+    overlay_file=$output_file
+    echo " - Created decrypted VM overlay file: $overlay_file"
+fi
+
 
 echo
 echo "Checking for compression.."
-compressed=`echo $patch_file | grep lzma`
+compressed=`echo $overlay_file | grep lzma`
 if [ "$compressed" != "" ]; then
     echo "Decompressing.."
-    output_file=`basename $patch_file`
-    output_file=/tmp/output_file
-	lzcat $patch_file > $output_file
-	patch_file=$output_file
-	echo "New patch file: $patch_file"
+    unlzma $overlay_file
+    overlay_file=`echo $overlay_file | sed 's/.lzma//g'`
+    echo " - Created decompressed VM overlay file: $overlay_file"
 fi
+
 
 #
 ## Untar into VM's directory;  this will overwrite the .xml metadata file,
@@ -235,9 +272,9 @@ fi
 
 echo
 echo "Untarring.."
-tar xf $patch_file -C $homedir/.VirtualBox/Machines/
+tar xf $overlay_file -C $homedir/.VirtualBox/Machines/
 
-mem_snapshot_uuid=`tar tf $patch_file | grep .diff | cut -f3 -d'/' | cut -f1 -d'.'`
+mem_snapshot_uuid=`tar tf $overlay_file | grep .diff | cut -f3 -d'/' | cut -f1 -d'.'`
 mem_current_uuid=`cat $homedir/.VirtualBox/Machines/$1/$1.xml | grep stateFile | head -1 | cut -f12 -d'"' | cut -f2 -d'{' | cut -f1 -d'}'`
 mem_current_file=$homedir/.VirtualBox/Machines/$1/Snapshots/{$mem_current_uuid}.sav
 mem_snapshot_diff=$homedir/.VirtualBox/Machines/$1/Snapshots/${mem_snapshot_uuid}.diff

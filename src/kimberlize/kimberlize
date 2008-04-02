@@ -82,7 +82,7 @@ install_script=""
 execute_script=""
 encryption=0
 encryption_keyfile=""
-patch_filename=""
+overlay_filename=""
 
 
 while getopts ":l:np:ek:h" Option
@@ -279,7 +279,7 @@ scp $HOME/.VirtualBox/Machines/$vm_name/$vm_name.xml /tmp/$vm_name/$vm_name.xml
 scp $HOME/.VirtualBox/VirtualBox.xml /tmp/$vm_name/VirtualBox.xml
 
 tar cf /tmp/${vm_name}-app_state.tar -C /tmp $vm_name
-patch_filename="/tmp/${vm_name}-app_state.tar"
+overlay_filename="/tmp/${vm_name}-app_state.tar"
 
 ls -lR /tmp/$vm_name
 rm -rf /tmp/$vm_name
@@ -306,9 +306,9 @@ echo "VM returned to base state."
 
 if [ $compression -eq 1 ]; then
     echo
-    echo "Compressing kimberlize patch.."
-    lzma $patch_filename
-    patch_filename=${patch_filename}.lzma
+    echo "Compressing VM overlay (LZMA).."
+    lzma $overlay_filename
+    overlay_filename=${overlay_filename}.lzma
 else
     echo
     echo "Compression disabled, ignoring.."
@@ -317,17 +317,17 @@ fi
 
 if [ $encryption -ne 0 ]; then
     echo
-    echo "Encrypting kimberlize patch (AES-128).."
+    echo "Encrypting VM overlay (AES-128).."
     if [ "$encryption_keyfile" != "" ]; then
 	echo "  - Using passphrase from first line of supplied file '$encryption_keyfile'.."
     else
-	encryption_keyfile="${patch_filename}.key"
+	encryption_keyfile="${overlay_filename}.key"
 	od -X -A n -N 16 --width=32 /dev/urandom > $encryption_keyfile
 	echo " - Generated encryption key in file '$encryption_keyfile'.."
     fi
-    openssl enc -aes-128-cbc -e -pass file:$encryption_keyfile -in $patch_filename -out ${patch_filename}.enc
-    rm $patch_filename
-    patch_filename=${patch_filename}.enc
+    openssl enc -aes-128-cbc -e -pass file:$encryption_keyfile -in $overlay_filename -out ${overlay_filename}.enc
+    rm $overlay_filename
+    overlay_filename=${overlay_filename}.enc
 else
     echo
     echo "Encryption disabled, ignoring.."
@@ -335,7 +335,7 @@ fi
 
 
 echo
-echo "Complete!  Your state is in the file '$patch_filename'"
+echo "Complete!  Your state is in the file '$overlay_filename'"
 echo "It can be renamed to whatever you like, provided the extensions remain."
 echo
 
