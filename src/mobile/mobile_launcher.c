@@ -33,8 +33,7 @@ enum vm_type {
 
 void
 usage(char *argv0) {
-  printf("%s [-d floppy-file] <[-f patch-file] || [-i URL]> <vm-name>\n", 
-	 argv0);
+  printf("%s [-a floppy-file] [-d encryption-key-file] <[-f patch-file] || [-i URL]> <vm-name>\n", argv0);
 }
 
 
