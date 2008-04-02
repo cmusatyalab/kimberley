@@ -21,7 +21,7 @@
 
 usage()
 {
-    echo "usage: `basename $0` [-d floppy-file] <[-f patch-file] || [-i URL]> <vm-name>"
+    echo "usage: dekimberlize [-a floppy-file] [-d encryption-key-file] <[-f patch-file] || [-i URL]> <vm-name>"
 }
 
 
