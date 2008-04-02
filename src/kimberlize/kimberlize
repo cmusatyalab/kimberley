@@ -78,13 +78,24 @@ snapshot_name="base"
 login_name="kimberley"
 login_port=2222
 compression=1
-homedir=`printenv HOME`
 install_script=""
 execute_script=""
+encryption=0
+encryption_keyfile=""
+patch_filename=""
 
-while getopts ":l:np:h" Option
+
+while getopts ":l:np:ek:h" Option
 do
 	case $Option in
+		e) 	
+			echo "Enabling encryption.."
+			encryption=1
+			;;
+		k) 	
+			echo "Using encryption passphrase from file '$OPTARG'"
+			encryption_keyfile=$OPTARG
+			;;
 		l) 	
 			echo "Using login name '$OPTARG'.."
 			login_name=$OPTARG
@@ -237,14 +248,14 @@ fi
 # Parse the various UUIDs used in filename construction.
 #
 
-mem_snapshot_uuid=`cat $homedir/.VirtualBox/Machines/$vm_name/$vm_name.xml | grep currentSnapshot | cut -f4 -d'"' | sed -e 's/{//g' | sed -e 's/}//g'`
-mem_snapshot_file="$homedir/.VirtualBox/Machines/$vm_name/Snapshots/{${mem_snapshot_uuid}}.sav"
+mem_snapshot_uuid=`cat $HOME/.VirtualBox/Machines/$vm_name/$vm_name.xml | grep currentSnapshot | cut -f4 -d'"' | sed -e 's/{//g' | sed -e 's/}//g'`
+mem_snapshot_file="$HOME/.VirtualBox/Machines/$vm_name/Snapshots/{${mem_snapshot_uuid}}.sav"
 
-mem_current_uuid=`cat $homedir/.VirtualBox/Machines/$vm_name/$vm_name.xml | grep stateFile | head -1 | cut -f12 -d'"' | cut -f2 -d'{' | cut -f1 -d'}'` 
-mem_current_file="$homedir/.VirtualBox/Machines/$vm_name/Snapshots/{${mem_current_uuid}}.sav"
+mem_current_uuid=`cat $HOME/.VirtualBox/Machines/$vm_name/$vm_name.xml | grep stateFile | head -1 | cut -f12 -d'"' | cut -f2 -d'{' | cut -f1 -d'}'` 
+mem_current_file="$HOME/.VirtualBox/Machines/$vm_name/Snapshots/{${mem_current_uuid}}.sav"
 
-disk_current_uuid=`cat $homedir/.VirtualBox/Machines/$vm_name/$vm_name.xml | grep hardDisk | tail -1 | cut -f6 -d'"' | sed -e 's/{//g' | sed -e 's/}//g'`
-disk_current_file="$homedir/.VirtualBox/Machines/$vm_name/Snapshots/{${disk_current_uuid}}.vdi"
+disk_current_uuid=`cat $HOME/.VirtualBox/Machines/$vm_name/$vm_name.xml | grep hardDisk | tail -1 | cut -f6 -d'"' | sed -e 's/{//g' | sed -e 's/}//g'`
+disk_current_file="$HOME/.VirtualBox/Machines/$vm_name/Snapshots/{${disk_current_uuid}}.vdi"
 
 
 ########################################################################
@@ -263,10 +274,13 @@ xdelta delta $mem_snapshot_file $mem_current_file /tmp/$vm_name/Snapshots/${mem_
 echo
 echo "Taking the delta between current disk image and the checkpoint's.."
 #scp $disk_current_file /tmp/$vm_name/Snapshots/
-scp $homedir/.VirtualBox/Machines/$vm_name/Snapshots/*.vdi /tmp/$vm_name/Snapshots/
-scp $homedir/.VirtualBox/Machines/$vm_name/$vm_name.xml /tmp/$vm_name/$vm_name.xml
-scp $homedir/.VirtualBox/VirtualBox.xml /tmp/$vm_name/VirtualBox.xml
+scp $HOME/.VirtualBox/Machines/$vm_name/Snapshots/*.vdi /tmp/$vm_name/Snapshots/
+scp $HOME/.VirtualBox/Machines/$vm_name/$vm_name.xml /tmp/$vm_name/$vm_name.xml
+scp $HOME/.VirtualBox/VirtualBox.xml /tmp/$vm_name/VirtualBox.xml
+
 tar cf /tmp/${vm_name}-app_state.tar -C /tmp $vm_name
+patch_filename="/tmp/${vm_name}-app_state.tar"
+
 ls -lR /tmp/$vm_name
 rm -rf /tmp/$vm_name
 
@@ -291,24 +305,40 @@ echo
 echo "VM returned to base state."
 
 if [ $compression -eq 1 ]; then
-	echo
-	echo "Compressing kimberlize patch.."
-	lzma /tmp/${vm_name}-app_state.tar
+    echo
+    echo "Compressing kimberlize patch.."
+    lzma $patch_filename
+    patch_filename=${patch_filename}.lzma
 else
-	echo
-	echo "Compression disabled, ignoring.."
+    echo
+    echo "Compression disabled, ignoring.."
+fi
+
+
+if [ $encryption -ne 0 ]; then
+    echo
+    echo "Encrypting kimberlize patch (AES-128).."
+    if [ "$encryption_keyfile" != "" ]; then
+	echo "  - Using passphrase from first line of supplied file '$encryption_keyfile'.."
+    else
+	encryption_keyfile="${patch_filename}.key"
+	od -X -A n -N 16 --width=32 /dev/urandom > $encryption_keyfile
+	echo " - Generated encryption key in file '$encryption_keyfile'.."
+    fi
+    openssl enc -aes-128-cbc -e -pass file:$encryption_keyfile -in $patch_filename -out ${patch_filename}.enc
+    rm $patch_filename
+    patch_filename=${patch_filename}.enc
+else
+    echo
+    echo "Encryption disabled, ignoring.."
 fi
 
 
 echo
-echo -n "Complete!  Your state is in the file '/tmp/${vm_name}-app_state.tar"
-if [ $compression -eq 1 ]; then
-	echo ".lzma'"
-else
-	echo "'"
-fi
-echo "It can be renamed to whatever you like, provided the extension remains."
+echo "Complete!  Your state is in the file '$patch_filename'"
+echo "It can be renamed to whatever you like, provided the extensions remain."
 echo
+
 
 ########################################################################
 # Info:
