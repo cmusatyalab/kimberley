@@ -33,20 +33,13 @@ enum vm_type {
 
 void
 usage(char *argv0) {
-  printf("%s [-a floppy-file] [-d encryption-key-file] <[-f patch-file] || [-i URL]> <vm-name>\n", argv0);
+  printf("mobile_launcher [-a floppy-file] [-d encryption-key-file]\n"
+	 "                <[-f patch-file] || [-i URL]> <vm-name>\n", argv0);
 }
 
 
 int
 perform_authentication(void) {
-  int err;
-  char command[ARG_MAX];
-
-  snprintf(command, ARG_MAX, "auth.py");
-  err = system(command);
-  if(err < 0)
-    return -1;
-
   return 0;
 }
 
