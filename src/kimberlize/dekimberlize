@@ -258,7 +258,7 @@ if [ "$compressed" != "" ]; then
     echo "Decompressing.."
     target_file=`echo $overlay_file | sed 's/.lzma//g'`
     lzcat -d $overlay_file > $target_file
-    rm $target_file
+    rm $overlay_file
     overlay_file=$target_file
     echo " - Created decompressed VM overlay file: $overlay_file"
 fi

@@ -247,13 +247,15 @@ fi
 # Parse the various UUIDs used in filename construction.
 #
 
-mem_snapshot_uuid=`cat $HOME/.VirtualBox/Machines/$vm_name/$vm_name.xml | grep currentSnapshot | cut -f4 -d'"' | sed -e 's/{//g' | sed -e 's/}//g'`
+homedir=`printenv HOME`
+
+mem_snapshot_uuid=`cat $homedir/.VirtualBox/Machines/$vm_name/$vm_name.xml | grep currentSnapshot | cut -f4 -d'"' | sed -e 's/{//g' | sed -e 's/}//g'`
 mem_snapshot_file="$HOME/.VirtualBox/Machines/$vm_name/Snapshots/{${mem_snapshot_uuid}}.sav"
 
-mem_current_uuid=`cat $HOME/.VirtualBox/Machines/$vm_name/$vm_name.xml | grep stateFile | head -1 | cut -f12 -d'"' | cut -f2 -d'{' | cut -f1 -d'}'` 
+mem_current_uuid=`cat $homedir/.VirtualBox/Machines/$vm_name/$vm_name.xml | grep stateFile | head -1 | cut -f12 -d'"' | cut -f2 -d'{' | cut -f1 -d'}'` 
 mem_current_file="$HOME/.VirtualBox/Machines/$vm_name/Snapshots/{${mem_current_uuid}}.sav"
 
-disk_current_uuid=`cat $HOME/.VirtualBox/Machines/$vm_name/$vm_name.xml | grep hardDisk | tail -1 | cut -f6 -d'"' | sed -e 's/{//g' | sed -e 's/}//g'`
+disk_current_uuid=`cat $homedir/.VirtualBox/Machines/$vm_name/$vm_name.xml | grep hardDisk | tail -1 | cut -f6 -d'"' | sed -e 's/{//g' | sed -e 's/}//g'`
 disk_current_file="$HOME/.VirtualBox/Machines/$vm_name/Snapshots/{${disk_current_uuid}}.vdi"
 
 
