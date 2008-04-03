@@ -166,6 +166,14 @@ main(int argc, char *argv[])
   unsigned short     port;
 
 
+  if(log_init() < 0) {
+    fprintf(stderr, "(display-launcher) Couldn't initialize log!\n");
+    exit(EXIT_FAILURE);
+  }
+
+  log_message("display launcher started up..");
+
+
   memset(&current_state, 0, sizeof(kimberley_state_t));
   pthread_mutex_init(&current_state.mutex, NULL);
 

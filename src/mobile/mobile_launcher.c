@@ -295,6 +295,14 @@ main(int argc, char *argv[])
   }
   
 
+  if(log_init() < 0) {
+    fprintf(stderr, "(mobile-launcher) Couldn't initialize log!\n");
+    exit(EXIT_FAILURE);
+  }
+
+  log_message("mobile launcher started up..");
+
+
   fprintf(stderr, "(mobile-launcher) starting up..\n");
   
   while((opt = getopt(argc, argv, "a:d:f:i:")) != -1) {
@@ -348,7 +356,6 @@ main(int argc, char *argv[])
   }
 
   vm = argv[optind];
-
   
   g_type_init();
   

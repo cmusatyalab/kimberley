@@ -13,10 +13,123 @@
 #include "common.h"
 
 
+static int log_ready = 0;
+static FILE *log_fp = NULL;
+static pthread_mutex_t log_mutex;
+
+
+int
+log_init(void) {
+  int err;
+  struct timeval tv;
+  struct tm* tm;
+  char log_filename[PATH_MAX];
+  char time_str[200];
+
+
+  if(log_ready != 0 || log_fp != NULL)
+    return -1;
+  
+  memset(&tv, 0, sizeof(struct timeval));
+
+  err = pthread_mutex_init(&log_mutex, NULL);
+  if(err != 0) {
+    fprintf(stderr, "(common) failed initializing log mutex!\n");
+    return -1;
+  }
+
+  gettimeofday(&tv, NULL);
+  tm = localtime(&tv.tv_sec);
+
+
+  /*
+   * Format the date and time, down to a single second. 
+   */
+
+  strftime(time_str, 200, "%Y-%m-%d_%H:%M:%S", tm);
+
+
+  /*
+   * Print the formatted time, in seconds, followed by a decimal point
+   *  and the milliseconds. 
+   */
+
+  snprintf(log_filename, PATH_MAX, "/tmp/%s.log\n", time_str);
+
+  log_fp = fopen(log_filename, "w");
+  if(log_fp == NULL) {
+    perror("(common) fopen");
+    return -1;
+  }
+  
+  log_ready = 1;
+
+  return 0;
+}
+
+
+int
+log_message(char *message) {
+  int err;
+  struct timeval tv;
+  struct tm *tm;
+  char ftime_str[200];
+  char time_str[200];
+  double frac_sec;
+
+  if(log_ready == 0 || log_fp == NULL || message == NULL)
+    return -1;
+
+  err = pthread_mutex_lock(&log_mutex);
+  if(err < 0) {
+    fprintf(stderr, "(common) pthread_mutex_lock returned "
+	    "error: %d\n", err);
+    return -1;
+  }
+
+  memset(&tv, 0, sizeof(struct timeval));
+  gettimeofday(&tv, NULL);
+
+  tm = localtime(&tv.tv_sec);
+  
+  frac_sec = (double)tv.tv_usec / (double)1000000;
+
+
+  /*
+   * Format the date and time, down to a single second. 
+   */
+
+  strftime(ftime_str, 200, "%Y-%m-%d_%H:%M:%S", tm);
+  snprintf(time_str, 200, "%s.%.0f: ", ftime_str, frac_sec);
+  
+  err = fwrite(time_str, strlen(time_str), 1, log_fp);
+  if(err <= 0) {
+    perror("(common) fwrite");
+    pthread_mutex_unlock(&log_mutex);
+    return -1;
+  }
+
+  err = fwrite(message, strlen(message), 1, log_fp);
+  if(err <= 0) {
+    perror("(common) fwrite");
+    pthread_mutex_unlock(&log_mutex);
+    return -1;
+  }
+
+  err = pthread_mutex_unlock(&log_mutex);
+  if(err < 0) {
+    fprintf(stderr, "(common) pthread_mutex_unlock returned "
+	    "error: %d\n", err);
+    return -1;
+  }
+
+  return 0;
+}
 
 /*
  * Write "n" bytes to a descriptor reliably. 
  */
+
 ssize_t                        
 writen(int fd, const void *vptr, size_t n)
 {

@@ -16,6 +16,8 @@
 
 #define CHUNK_SIZE 1048576
 
+int            log_init(void);
+int            log_message(char *message);
 
 CLIENT *       convert_socket_to_rpc_client(int connfd, 
 					    unsigned int prog,
