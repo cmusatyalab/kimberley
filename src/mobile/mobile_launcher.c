@@ -710,7 +710,7 @@ main(int argc, char *argv[])
       fprintf(stderr, "(mobile-launcher) Couldn't retrieve '/tmp/dekimberlize.log'\n");
     }
     else {
-      log_append_file("/tmp/dekimberlize.log/");
+      log_append_file("/tmp/dekimberlize.log");
     }
     
     log_message("mobile launcher retrieving dekimberlize log file");
