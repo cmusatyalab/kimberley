@@ -98,11 +98,10 @@ log_message(char *message) {
    */
 
   strftime(ftime_str, 200, "%Y-%m-%d_%H:%M:%S", tm);
-  snprintf(logmsg, ARG_MAX, "%s.%.6u: %s\n", ftime_str, tv.tv_usec, message);
   
   fprintf(stderr, "(common) logging message: %s\n", logmsg);
 
-  err = fwrite(logmsg, strlen(logmsg), 1, log_fp);
+  err = fprintf(log_fp, "%s.%.6u: %s\n", ftime_str, tv.tv_usec, message);
   if(err <= 0) {
     perror("(common) fwrite");
     pthread_mutex_unlock(&log_mutex);
