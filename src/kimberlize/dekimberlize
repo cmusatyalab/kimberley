@@ -71,7 +71,7 @@ sleep_until_vm_running()
         if [ $vm_status -eq 1 ]; then
             return 1
         fi
-        sleep 1s
+        sleep 0.001s
     done
 
     return 0
@@ -94,7 +94,7 @@ sleep_until_vm_stopped()
         if [ $vm_status -eq 0 ]; then
             return 1
         fi
-        sleep 1s
+        sleep 0.001s
     done
 
     return 0
@@ -104,6 +104,8 @@ sleep_until_vm_stopped()
 ########################################################################
 # Beginning of actual dekimberlize script execution
 #
+
+gettimeofday "dekimberlize loaded" > /tmp/dekimberlize.log
     
 if [ $# -lt 3 ]; then
 	usage
@@ -128,6 +130,8 @@ decryption_keyfile=""
 ########################################################################
 # Process command-line options.
 #
+
+gettimeofday "dekimberlize parsing options" >> /tmp/dekimberlize.log
 
 while getopts ":a:d:f:i:h" Option
 do
@@ -197,6 +201,8 @@ do
 done
 shift $(($OPTIND-1))
 
+gettimeofday "dekimberlize finished parsing options" >> /tmp/dekimberlize.log
+
 
 ########################################################################
 # Check to see the environment is acceptable to execute in, i.e. that
@@ -241,10 +247,16 @@ rm -f /tmp/dekimberlize_finished
 # decrypting and decompressing first if necessary.
 #
 
+
 if [ "$decryption_keyfile" != "" ]; then
+
     echo "Decrypting.."
     output_file=`echo $overlay_file | sed 's/.enc//g'`
+
+    gettimeofday "dekimberlize decrypting VM overlay" >> /tmp/dekimberlize.log
     openssl enc -aes-128-cbc -d -pass file:$decryption_keyfile -in $overlay_file -out $output_file
+    gettimeofday "dekimberlize completed decrypting VM overlay" >> /tmp/dekimberlize.log
+
     rm $overlay_file
     overlay_file=$output_file
     echo " - Created decrypted VM overlay file: $overlay_file"
@@ -257,7 +269,9 @@ compressed=`echo $overlay_file | grep lzma`
 if [ "$compressed" != "" ]; then
     echo "Decompressing.."
     target_file=`echo $overlay_file | sed 's/.lzma//g'`
+    gettimeofday "dekimberlize uncompressing VM overlay" >> /tmp/dekimberlize.log
     lzcat -d $overlay_file > $target_file
+    gettimeofday "dekimberlize completed uncompressing VM overlay" >> /tmp/dekimberlize.log
     rm $overlay_file
     overlay_file=$target_file
     echo " - Created decompressed VM overlay file: $overlay_file"
@@ -274,6 +288,7 @@ fi
 
 echo
 echo "Untarring.."
+gettimeofday "dekimberlize untarring/patching VM overlay" >> /tmp/dekimberlize.log
 tar xf $overlay_file -C $homedir/.VirtualBox/Machines/
 
 mem_snapshot_uuid=`tar tf $overlay_file | grep .diff | cut -f3 -d'/' | cut -f1 -d'.'`
@@ -289,11 +304,15 @@ mv $mem_current_file $mem_snapshot_file
 
 mv $homedir/.VirtualBox/Machines/$1/VirtualBox.xml $homedir/.VirtualBox/
 
+gettimeofday "dekimberlize completed untarring VM overlay" >> /tmp/dekimberlize.log
+
 echo
 echo "Applying delta ($mem_snapshot_diff) of memory state.."
 xdelta patch $mem_snapshot_diff $mem_snapshot_file $mem_current_file
 chmod 600 $mem_current_file
 rm $mem_snapshot_diff
+gettimeofday "dekimberlize completed patching VM overlay" >> /tmp/dekimberlize.log
+
 
 echo
 echo "Port forwarding (host:2222 -> guest:22).."
@@ -309,11 +328,23 @@ VBoxManage setextradata $1 "VBoxInternal/Devices/pcnet/0/LUN#0/Config/diamond_ss
 
 echo
 echo "Resuming VM '$1'.."
+gettimeofday "dekimberlize resuming VM" >> /tmp/dekimberlize.log
 VBoxManage startvm $1 > /dev/null
 if [ $? -ne 0 ]; then
     echo `basename $0`: error: failed resuming VM
     failure 
 fi
+
+
+sleep_until_vm_running $1 300
+if [ $? -ne 1 ]; then
+    echo "VM did not load! Stopping Dekimberlize process.."
+    failure
+fi
+
+touch /tmp/dekimberlize.resumed
+
+gettimeofday "dekimberlize completed resuming VM" >> /tmp/dekimberlize.log
 
 
 #
@@ -330,18 +361,15 @@ if [ $floppy_original != "" ]; then
 
     echo
     echo "Waiting for VM to load.."
-    sleep_until_vm_running $1 300
-    if [ $? -ne 1 ]; then
-        echo "VM did not load! Stopping Dekimberlize process.."
-        failure
-    fi
 
     echo
     echo "Attaching floppy disk '$floppy_original' to VM.."
+    gettimeofday "dekimberlize attaching floppy to VM" >> /tmp/dekimberlize.log
     VBoxManage controlvm $1 floppyattach $floppy_copy
     if [ $? -ne 0 ]; then
     	echo `basename $0`: error: failed attaching floppy disk 
     fi
+    gettimeofday "dekimberlize completed attaching floppy to VM" >> /tmp/dekimberlize.log
 else
     echo
     echo "Not attaching floppy disk to VM.."
@@ -356,10 +384,12 @@ fi
 
 echo
 echo "VM loaded! Waiting for the user to finish.."
+gettimeofday "dekimberlize beginning user interaction" >> /tmp/dekimberlize.log
 while [ ! -e /tmp/dekimberlize_finished ]; do
 	printf . || true
 	sleep 1s
 done
+gettimeofday "dekimberlize ending user interaction" >> /tmp/dekimberlize.log
 
 echo
 echo "The user has ended the session."
@@ -378,10 +408,13 @@ echo "The user has ended the session."
 if [ $floppy_original != "" ]; then
     echo
     echo "Detaching floppy disk from VM.."
-	VBoxManage controlvm $1 floppyattach none
+
+    gettimeofday "dekimberlize detaching floppy from VM" >> /tmp/dekimberlize.log
+    VBoxManage controlvm $1 floppyattach none
     if [ $? -ne 0 ]; then
         echo `basename $0`: error: failed attaching floppy disk
     fi
+    gettimeofday "dekimberlize completed detaching floppy from VM" >> /tmp/dekimberlize.log
 fi
 
 
@@ -391,6 +424,7 @@ fi
 
 echo
 echo "Powering VM $1 down.."
+gettimeofday "dekimberlize powering down VM" >> /tmp/dekimberlize.log
 VBoxManage controlvm $1 poweroff
 if [ $? -ne 0 ]; then
     echo `basename $0`: error: failed powering VM down
@@ -407,6 +441,7 @@ if [ $? -ne 1 ]; then
     echo "VM did not stop! Stopping Dekimberlize process.."
     failure
 fi
+gettimeofday "dekimberlize completed powering down VM" >> /tmp/dekimberlize.log
 
 
 #
@@ -417,10 +452,13 @@ fi
 if [ $floppy_original != "" ]; then
     echo
     echo "Unregistering floppy disk with VirtualBox.."
-	VBoxManage unregisterimage floppy $floppy_copy
+
+    gettimeofday "dekimberlize unregistering floppy disk" >> /tmp/dekimberlize.log
+    VBoxManage unregisterimage floppy $floppy_copy
     if [ $? -ne 0 ]; then
         echo `basename $0`: error: failed attaching floppy disk
     fi
+    gettimeofday "dekimberlize completed unregistering floppy disk" >> /tmp/dekimberlize.log
 fi
 
 
@@ -431,7 +469,9 @@ fi
 
 echo
 echo "Calculating the floppy's binary difference in file '$floppy_diff'.."
+gettimeofday "dekimberlize calculating floppy delta" >> /tmp/dekimberlize.log
 xdelta delta $floppy_original $floppy_copy $floppy_diff
+gettimeofday "dekimberlize completed calculating floppy delta" >> /tmp/dekimberlize.log
 
 
 #
@@ -441,11 +481,13 @@ xdelta delta $floppy_original $floppy_copy $floppy_diff
 
 echo
 echo "Discarding dirty state and restoring the original VM image.."
+gettimeofday "dekimberlize reverting to base VM" >> /tmp/dekimberlize.log
 VBoxManage snapshot $1 discardcurrent -all 
 if [ $? -ne 0 ]; then
     echo `basename $0`: error: failed discarding VM state
     failure 
 fi
+gettimeofday "dekimberlize completed reverting to base VM" >> /tmp/dekimberlize.log
 
 VBoxManage setextradata $1 "VBoxInternal/Devices/pcnet/0/LUN#0/Config/diamond_ssh/HostPort" > /dev/null
 VBoxManage setextradata $1 "VBoxInternal/Devices/pcnet/0/LUN#0/Config/diamond_ssh/GuestPort" > /dev/null
@@ -458,6 +500,7 @@ rm -f /tmp/dekimberlize.lock
 echo
 echo "Complete!"
 
+gettimeofday "dekimberlize completed" >> /tmp/dekimberlize.log
 
 ########################################################################
 # Miscellaneous Information:
