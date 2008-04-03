@@ -56,7 +56,7 @@ log_init(void) {
 
   snprintf(log_filename, PATH_MAX, "/tmp/%s.log\n", time_str);
 
-  log_fp = fopen(log_filename, "w");
+  log_fp = fopen(log_filename, "w+");
   if(log_fp == NULL) {
     perror("(common) fopen");
     return -1;
