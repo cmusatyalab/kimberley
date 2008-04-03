@@ -75,7 +75,6 @@ log_message(char *message) {
   struct timeval tv;
   struct tm *tm;
   char ftime_str[200];
-  char logmsg[ARG_MAX];
 
   if(log_ready == 0 || log_fp == NULL || message == NULL)
     return -1;
@@ -99,8 +98,6 @@ log_message(char *message) {
 
   strftime(ftime_str, 200, "%Y-%m-%d_%H:%M:%S", tm);
   
-  fprintf(stderr, "(common) logging message: %s\n", logmsg);
-
   err = fprintf(log_fp, "%s.%.6u: %s\n", ftime_str, tv.tv_usec, message);
   if(err <= 0) {
     perror("(common) fwrite");
