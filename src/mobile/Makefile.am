@@ -1,5 +1,5 @@
-bin_PROGRAMS = display_launcher mobile_launcher
-bin_SCRIPTS = display_setup
+bin_PROGRAMS = display_launcher mobile_launcher gettimeofday
+bin_SCRIPTS = display_setup 
 
 BUILT_SOURCES = \
 	rpc_mobile_launcher_clnt.c rpc_mobile_launcher_svc.c \
@@ -18,6 +18,8 @@ mobile_launcher_SOURCES = mobile_launcher.c \
 	rpc_mobile_launcher.x.in dcm.xml \
 	common.c common.h \
 	rpc_mobile_launcher_clnt.c rpc_mobile_launcher_xdr.c rpc_mobile_launcher.h
+
+gettimeofday_SOURCES = gettimeofday.c
 
 rpc_%_xdr.c: rpc_%.x
 	$(RM) $@
