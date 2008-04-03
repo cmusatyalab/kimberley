@@ -75,7 +75,7 @@ log_message(char *message) {
   struct tm *tm;
   char ftime_str[200];
   char time_str[200];
-  double frac_sec;
+  long ms;
 
   if(log_ready == 0 || log_fp == NULL || message == NULL)
     return -1;
@@ -91,8 +91,6 @@ log_message(char *message) {
   gettimeofday(&tv, NULL);
 
   tm = localtime(&tv.tv_sec);
-  
-  frac_sec = (double)tv.tv_usec / (double)1000000;
 
 
   /*
@@ -100,7 +98,7 @@ log_message(char *message) {
    */
 
   strftime(ftime_str, 200, "%Y-%m-%d_%H:%M:%S", tm);
-  snprintf(time_str, 200, "%s.%.0f: ", ftime_str, frac_sec);
+  snprintf(time_str, 200, "%s.%.6u: ", ftime_str, tv.tv_usec);
   
   err = fwrite(time_str, strlen(time_str), 1, log_fp);
   if(err <= 0) {
