@@ -705,21 +705,21 @@ main(int argc, char *argv[])
       log_message("mobile launcher completed indicating end of use to display");
     }
 
+    log_message("mobile launcher retrieving dekimberlize log file");
+    if(retrieve_file_in_pieces("/tmp/dekimberlize.log", clnt) < 0) {
+      fprintf(stderr, "(mobile-launcher) Couldn't retrieve '/tmp/dekimberlize.log'\n");
+    }
+    else {
+      log_append_file("/tmp/dekimberlize.log/");
+    }
+    
+    log_message("mobile launcher retrieving dekimberlize log file");
+    
     xdr_free((xdrproc_t) xdr_wrapstring, (char *)&diff_filename);
 
     clnt_destroy(clnt);
     clnt = NULL;
   }
-  
-  log_message("mobile launcher retrieving dekimberlize log file");
-  if(retrieve_file_in_pieces("/tmp/dekimberlize.log", clnt) < 0) {
-    fprintf(stderr, "(mobile-launcher) Couldn't retrieve '/tmp/dekimberlize.log'\n");
-  }
-  else {
-    log_append_file("/tmp/dekimberlize.log/");
-  }
-
-  log_message("mobile launcher retrieving dekimberlize log file");
 
   log_deinit();
 
