@@ -18,6 +18,7 @@
 
 int            log_init(void);
 int            log_message(char *message);
+void           log_deinit(void);
 
 CLIENT *       convert_socket_to_rpc_client(int connfd, 
 					    unsigned int prog,

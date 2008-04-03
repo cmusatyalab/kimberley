@@ -76,6 +76,8 @@ cleanup(void) {
 
   pthread_mutex_init(&current_state.mutex, NULL);
 
+  log_deinit();
+
   return 0;
 }
 

@@ -711,6 +711,7 @@ main(int argc, char *argv[])
     clnt = NULL;
   }
   
+  log_deinit();
 
   if(gerr) g_error_free (gerr);
   if(dbus_proxy) g_object_unref(dbus_proxy);

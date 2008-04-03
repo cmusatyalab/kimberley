@@ -46,7 +46,7 @@ log_init(void) {
    * Format the date and time, down to a single second. 
    */
 
-  strftime(time_str, 200, "%Y-%m-%d_%H:%M:%S", tm);
+  strftime(time_str, 200, "%Y-%m-%d_%H-%M-%S", tm);
 
 
   /*
@@ -115,6 +115,29 @@ log_message(char *message) {
 
   return 0;
 }
+
+
+void
+log_deinit(void) {
+  int err;
+
+  err = pthread_mutex_lock(&log_mutex);
+  if(err < 0)
+    fprintf(stderr, "(common) pthread_mutex_lock returned "
+	    "error: %d\n", err);
+
+  log_ready = 0;
+  if(log_fp != NULL) {
+    fclose(log_fp);
+    log_fp = NULL;
+  }
+
+  err = pthread_mutex_unlock(&log_mutex);
+  if(err < 0)
+    fprintf(stderr, "(common) pthread_mutex_unlock returned "
+	    "error: %d\n", err);
+}
+
 
 /*
  * Write "n" bytes to a descriptor reliably. 
