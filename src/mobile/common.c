@@ -46,7 +46,7 @@ log_init(void) {
    * Format the date and time, down to a single second. 
    */
 
-  strftime(time_str, 200, "%Y-%m-%d_%H-%M-%S", tm);
+  strftime(time_str, 200, "%Y-%m-%d_%H:%M:%S", tm);
 
 
   /*
@@ -55,6 +55,7 @@ log_init(void) {
    */
 
   snprintf(log_filename, PATH_MAX, "/tmp/%s.log\n", time_str);
+  fprintf(stderr, "(common) initializing log: %s\n", log_filename);
 
   log_fp = fopen(log_filename, "w+");
   if(log_fp == NULL) {
@@ -99,6 +100,8 @@ log_message(char *message) {
   strftime(ftime_str, 200, "%Y-%m-%d_%H:%M:%S", tm);
   snprintf(logmsg, ARG_MAX, "%s.%.6u: %s\n", ftime_str, tv.tv_usec, message);
   
+  fprintf(stderr, "(common) logging message: %s\n", logmsg);
+
   err = fwrite(logmsg, strlen(logmsg), 1, log_fp);
   if(err <= 0) {
     perror("(common) fwrite");
@@ -125,6 +128,8 @@ log_deinit(void) {
   if(err < 0)
     fprintf(stderr, "(common) pthread_mutex_lock returned "
 	    "error: %d\n", err);
+
+  fprintf(stderr, "(common) deinitializing log\n");
 
   log_ready = 0;
   if(log_fp != NULL) {
