@@ -54,7 +54,7 @@ log_init(void) {
    *  and the milliseconds. 
    */
 
-  snprintf(log_filename, PATH_MAX, "/tmp/%s.log\n", time_str);
+  snprintf(log_filename, PATH_MAX, "/tmp/%s.log", time_str);
   fprintf(stderr, "(common) initializing log: %s\n", log_filename);
 
   log_fp = fopen(log_filename, "w+");
