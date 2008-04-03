@@ -181,7 +181,9 @@ do
         overlay_file=`basename $OPTARG`
         echo
         echo "PARAM: VM overlay URL '$overlay_file'.."
+	gettimeofday "dekimberlize fetching VM overlay from URL" >> /tmp/dekimberlize.log
         wget -O /tmp/$overlay_file $OPTARG
+	gettimeofday "dekimberlize completed fetching VM overlay from URL" >> /tmp/dekimberlize.log
         overlay_file=/tmp/$overlay_file
         ;;
 

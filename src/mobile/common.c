@@ -74,8 +74,7 @@ log_message(char *message) {
   struct timeval tv;
   struct tm *tm;
   char ftime_str[200];
-  char time_str[200];
-  long ms;
+  char logmsg[ARG_MAX];
 
   if(log_ready == 0 || log_fp == NULL || message == NULL)
     return -1;
@@ -98,16 +97,9 @@ log_message(char *message) {
    */
 
   strftime(ftime_str, 200, "%Y-%m-%d_%H:%M:%S", tm);
-  snprintf(time_str, 200, "%s.%.6u: ", ftime_str, tv.tv_usec);
+  snprintf(logmsg, ARG_MAX, "%s.%.6u: %s\n", ftime_str, tv.tv_usec, message);
   
-  err = fwrite(time_str, strlen(time_str), 1, log_fp);
-  if(err <= 0) {
-    perror("(common) fwrite");
-    pthread_mutex_unlock(&log_mutex);
-    return -1;
-  }
-
-  err = fwrite(message, strlen(message), 1, log_fp);
+  err = fwrite(logmsg, strlen(logmsg), 1, log_fp);
   if(err <= 0) {
     perror("(common) fwrite");
     pthread_mutex_unlock(&log_mutex);

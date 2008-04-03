@@ -34,7 +34,7 @@ enum vm_type {
 void
 usage(char *argv0) {
   printf("mobile_launcher [-a floppy-file] [-d encryption-key-file]\n"
-	 "                <[-f patch-file] || [-i URL]> <vm-name>\n", argv0);
+	 "                <[-f patch-file] || [-i URL]> <vm-name>\n");
 }
 
 
@@ -108,6 +108,7 @@ send_file_in_pieces(char *path, CLIENT *clnt) {
   int i, n, ret;
   FILE *fp;
   enum clnt_stat retval;
+  char logmsg[ARG_MAX];
 
   if((path == NULL) || (clnt == NULL))
     return -1;
@@ -130,11 +131,18 @@ send_file_in_pieces(char *path, CLIENT *clnt) {
   fprintf(stderr, "(mobile-launcher) Transfer of %s (size=%d) will take %d"
 	  " RPCs.\n", path, (int) buf.st_size, n);
 
+  snprintf(logmsg, ARG_MAX, "mobile launcher requesting send of file, size: %u", buf.st_size);
+  log_message(logmsg);
+
   retval = send_file_1(path, buf.st_size, &ret, clnt);
   if(retval != RPC_SUCCESS) {
     clnt_perror (clnt, "send_file RPC call failed");
     return -1;
   }  
+
+  log_message("mobile launcher completed send request");
+
+  log_message("mobile launcher sending file");
 
   for(i=0; i<n; i++) {
     char partial_bytes[CHUNK_SIZE];
@@ -161,6 +169,8 @@ send_file_in_pieces(char *path, CLIENT *clnt) {
     fprintf(stderr, ".");
   }
 
+  log_message("mobile launcher completed send of file");
+
   return 0;
 }
 
@@ -170,6 +180,7 @@ retrieve_file_in_pieces(char *path, CLIENT *clnt) {
   int i, n, size=0;
   FILE *fp;
   enum clnt_stat retval;
+  char logmsg[ARG_MAX];
 
   if((path == NULL) || (clnt == NULL))
     return -1;
@@ -182,17 +193,21 @@ retrieve_file_in_pieces(char *path, CLIENT *clnt) {
     return -1;
   }
 
+  log_message("mobile launcher requesting retrieval of file");
   retval = retrieve_file_1(path, &size, clnt);
   if(retval != RPC_SUCCESS) {
     clnt_perror (clnt, "retrieve_file RPC call failed");
     fclose(fp);
     return -1;
   }
+  snprintf(logmsg, ARG_MAX, "mobile launcher completed request for retrieval of file, size: %d", size);
+  log_message(logmsg);
 
   n = (int) ceilf(((float)size)/((float)CHUNK_SIZE));
   fprintf(stderr, "(mobile-launcher) Transfer of %s (size=%d) will take %d"
 	  " RPCs.\n", path, (int) size, n);
 
+  log_message("mobile launcher retrieving file");
   for(i=0; i<n; i++) {
     data partial_data;
     unsigned int num_bytes;
@@ -217,6 +232,7 @@ retrieve_file_in_pieces(char *path, CLIENT *clnt) {
 
     fprintf(stderr, ".");
   }
+  log_message("mobile launcher completed retrieving file");
 
   fclose(fp);
 
@@ -279,8 +295,12 @@ main(int argc, char *argv[])
   char *overlay_path = NULL;
   char *floppy_path = NULL;
   char *encryption_key_path = NULL;
+
+  char logmsg[ARG_MAX];
   
-  int connfd = 0; 
+  int connfd = 0;
+  int ms;
+
   CLIENT *clnt = NULL;
 
   if(argc < 4) {
@@ -305,6 +325,8 @@ main(int argc, char *argv[])
 
   fprintf(stderr, "(mobile-launcher) starting up..\n");
   
+  log_message("mobile launcher parsing options..");
+
   while((opt = getopt(argc, argv, "a:d:f:i:")) != -1) {
 
     switch(opt) {
@@ -357,6 +379,10 @@ main(int argc, char *argv[])
 
   vm = argv[optind];
   
+  log_message("mobile launcher completed parsing options..");
+
+  log_message("mobile launcher connecting to DBUS..");
+
   g_type_init();
   
   fprintf(stderr, "(mobile-launcher) connecting to DBus session bus..\n");
@@ -386,6 +412,7 @@ main(int argc, char *argv[])
     goto cleanup;
   }
 	
+  log_message("mobile launcher completed connecting to DBUS..");
 	
   /*
    * Signal DCM that you would like it to search for an RPC service.
@@ -395,6 +422,8 @@ main(int argc, char *argv[])
    */
 
   fprintf(stderr, "(mobile-launcher) DBus calling into dcm for RPC conn..\n");
+
+  log_message("mobile launcher requesting service discovery from DCM..");
 
   if(!edu_cmu_cs_diamond_opendiamond_dcm_client(dbus_proxy, 
 						LAUNCHER_DCM_SERVICE_NAME, 
@@ -406,6 +435,8 @@ main(int argc, char *argv[])
     goto cleanup;
   }
 
+  log_message("mobile launcher completed request for service discovery");
+
   fprintf(stderr, "(mobile-launcher) DCM client() returned port: %d\n", 
 	  g_rpc_port);
   
@@ -413,6 +444,8 @@ main(int argc, char *argv[])
   /* Create new loopback connection to the Sun RPC server on the
    * port that it indicated in the D-Bus message. */
   
+  log_message("mobile launcher connecting to DCM");
+
   if((connfd = socket(AF_INET, SOCK_STREAM, 0)) < 0) {
     perror("socket");
     ret = EXIT_FAILURE;
@@ -438,10 +471,15 @@ main(int argc, char *argv[])
     ret = EXIT_FAILURE;
     goto cleanup;
   }
+
+  log_message("mobile launcher completed connecting to DCM");
   
   fprintf(stderr, "(mobile-launcher) successfully connected. bringing up "
 	  "launcher..\n");
   
+
+  log_message("mobile launcher establishing connection to display");
+
   clnt = convert_socket_to_rpc_client(connfd, MOBILELAUNCHER_PROG, 
 				      MOBILELAUNCHER_VERS);
   if(clnt == NULL) {
@@ -451,11 +489,21 @@ main(int argc, char *argv[])
     goto cleanup;
   }
 
+  //perform_authentication();
 
-  perform_authentication();
+  retval = ping_1((void *)NULL, clnt);
+  if(retval != RPC_SUCCESS) {
+    fprintf(stderr, "(mobile-launcher) ping failed!\n");
+    return (float) -1;
+  }
+
+  log_message("mobile launcher completed establishing connection to display");
 
 
-  if(determine_rtt(clnt) > 1000) {
+  log_message("mobile launcher calculating latency");
+
+  ms = determine_rtt(clnt);
+  if(ms > 1000) {
     fprintf(stderr, "(mobile-launcher) Connection is slower than 1000ms\n");
     //use_USB = ask_user_for_USB();
   }
@@ -463,6 +511,8 @@ main(int argc, char *argv[])
     fprintf(stderr, "(mobile-launcher) Connection is faster than 1000ms\n");
   }
 
+  snprintf(logmsg, ARG_MAX, "mobile launcher completed calculating latency: %u ms", ms);
+  log_message(logmsg);
 
   /*
    * Send a floppy disk filesystem image to be attached to a running
@@ -472,17 +522,21 @@ main(int argc, char *argv[])
   if(floppy_path != NULL) {
     fprintf(stderr, "(mobile-launcher) Sending floppy disk image..\n");
     
+    log_message("mobile launcher sending floppy disk");
     if(send_file_in_pieces(floppy_path, clnt) < 0) {
       fprintf(stderr, "(mobile-launcher) failed sending floppy disk image file\n");
       floppy_path = NULL;
     }
     else {
+      log_message("mobile launcher completed sending floppy disk");
+      log_message("mobile launcher indicating floppy disk filename");
       retval = use_persistent_state_1(floppy_path, &err, clnt);
       if (retval != RPC_SUCCESS) {
 	fprintf(stderr, "(mobile-launcher) setting persistent state file "
 		"failed: %s\n", clnt_sperrno(retval));
 	floppy_path = NULL;
       }
+      log_message("mobile launcher completed indicating floppy disk filename");
     }
   }
 
@@ -494,11 +548,14 @@ main(int argc, char *argv[])
   if(encryption_key_path != NULL) {
     fprintf(stderr, "(mobile-launcher) Sending encryption key..\n");
     
+    log_message("mobile launcher sending encryption key");
     if(send_file_in_pieces(encryption_key_path, clnt) < 0) {
       fprintf(stderr, "(mobile-launcher) failed sending encryption key file\n");
       floppy_path = NULL;
     }
     else {
+      log_message("mobile launcher completed sending encryption key");
+      log_message("mobile launcher indicating encryption key filename");
       retval = use_encryption_key_1(encryption_key_path, &err, clnt);
       if (retval != RPC_SUCCESS) {
 	fprintf(stderr, "(mobile-launcher) setting encryption key file "
@@ -506,6 +563,7 @@ main(int argc, char *argv[])
 	encryption_key_path = NULL;
 	goto cleanup;
       }
+      log_message("mobile launcher completed indicating encryption key filename");
     }
   }
 
@@ -518,13 +576,16 @@ main(int argc, char *argv[])
 
   case VM_FILE:
     fprintf(stderr, "(mobile-launcher) Sending VM overlay..\n");
+    log_message("mobile launcher sending VM overlay");
     if(send_file_in_pieces(overlay_path, clnt) < 0) {
       fprintf(stderr, "(mobile-launcher) failed sending VM overlay!\n");
       ret = EXIT_FAILURE;
       goto cleanup;
     }
+    log_message("mobile launcher completed sending VM overlay");
 
     fprintf(stderr, "(mobile-launcher) Loading VM..\n");
+    log_message("mobile launcher loading VM");
     retval = load_vm_from_attachment_1(vm, overlay_path, &err, clnt);
     if (retval != RPC_SUCCESS) {
       fprintf(stderr, "(mobile-launcher) load VM from attachment failed: %s", 
@@ -532,10 +593,12 @@ main(int argc, char *argv[])
       ret = EXIT_FAILURE;
       goto cleanup;
     }
+    log_message("mobile launcher completed loading VM");
     break;
 
   case VM_URL:
     fprintf(stderr, "(mobile-launcher) Loading VM..\n");
+    log_message("mobile launcher loading VM");
     retval = load_vm_from_url_1(vm, overlay_path, &err, clnt);
     if (retval != RPC_SUCCESS) {
       fprintf(stderr, "(mobile-launcher) load VM from URL failed: %s", 
@@ -543,6 +606,7 @@ main(int argc, char *argv[])
       ret = EXIT_FAILURE;
       goto cleanup;
     }
+    log_message("mobile launcher completed loading VM");
     break;
 
   default:
@@ -555,6 +619,7 @@ main(int argc, char *argv[])
    * Signal DCM that you would like it to search for a VNC service.
    */
 
+  log_message("mobile launcher requesting into DCM for thin client connection");
   vnc_port = establish_thin_client_connection(dbus_proxy);
   if(vnc_port < 0) {
     fprintf(stderr, "(mobile-launcher) DCM couldn't discover thin client "
@@ -566,14 +631,17 @@ main(int argc, char *argv[])
     fprintf(stderr, "(mobile-launcher) DCM client() returned port: %d\n", 
 	    vnc_port);
   }
+  log_message("mobile launcher completed request into DCM for thin client connection");
 
   snprintf(command, ARG_MAX, "vncviewer localhost::%u", vnc_port);
   fprintf(stderr, "(mobile-launcher) executing: %s\n", command);
+  log_message("mobile launcher executing VNCviewer");
   err = system(command);
   if(err < 0) {
     perror("system");
     ret = EXIT_FAILURE;
   }
+  log_message("mobile launcher completed executing VNCviewer");
 
   
  cleanup:
@@ -589,7 +657,9 @@ main(int argc, char *argv[])
     if(floppy_path != NULL) {
       char  diff_filename_local[PATH_MAX];
       
+      log_message("mobile launcher indicating end of use to display");
       end_usage_1(1, &diff_filename, clnt);
+      log_message("mobile launcher completed indicating end of use to display");
       if(diff_filename != NULL) {
 	char *bname;
 	char command[ARG_MAX];
@@ -601,30 +671,38 @@ main(int argc, char *argv[])
 	diff_filename_local[0] = '\0';
 	snprintf(diff_filename_local, PATH_MAX, "/tmp/%s", bname);
 
+	log_message("mobile launcher retrieving persistent state delta");
 	if(retrieve_file_in_pieces(diff_filename_local, clnt) < 0) {
 	  fprintf(stderr, "(mobile-launcher) Couldn't retrieve '%s'\n",
 		  diff_filename);
 	}
+	log_message("mobile launcher completed retrieving persistent state delta");
 
 	fprintf(stderr, "(mobile-launcher) applying pers. state patch..\n");
 	snprintf(floppy_sum_path, PATH_MAX, "%s.new", floppy_path);
 	snprintf(command, ARG_MAX, "xdelta patch %s %s %s", 
 		 diff_filename_local, floppy_path, floppy_sum_path);
+	log_message("mobile launcher applying persistent state delta");
 	system(command);
+	log_message("mobile launcher completed applying persistent state delta");
 
 	remove(floppy_path);
 	rename(floppy_sum_path, floppy_path);
 
 	fprintf(stderr, "(mobile-launcher) remounting state image..\n");
 	snprintf(command, ARG_MAX, "mount %s", floppy_path);
+	log_message("mobile launcher remounting persistent state");
 	system(command);
+	log_message("mobile launcher remounting persistent state");
       }
       else {
 	fprintf(stderr, "(mobile-launcher) no persistent state path returned to retrieve!\n");
       }
     }
     else {
+      log_message("mobile launcher indicating end of use to display");
       end_usage_1(0, &diff_filename, clnt);
+      log_message("mobile launcher completed indicating end of use to display");
     }
 
     xdr_free((xdrproc_t) xdr_wrapstring, (char *)&diff_filename);
