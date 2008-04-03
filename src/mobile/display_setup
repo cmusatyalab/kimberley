@@ -21,8 +21,6 @@ echo x11vnc -once -display :0.0 -scale $scale
 
 x11vnc -once -display :0.0 -scale $scale > /tmp/x11vnc_port 2> /tmp/x11vnc_err &
 
-sleep 5s
-
 
 ########################################################################
 # Begin running dekimberlize in this new VM asap to load application

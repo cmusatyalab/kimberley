@@ -31,6 +31,7 @@ launch_display_scripts(void *arg) {
   current_state.display_in_progress = 1;
 
   remove("/tmp/x11vnc_port");
+  remove("/tmp/dekimberlize.resumed");
 
   err = system(command);
   if(err < 0) {
@@ -137,6 +138,7 @@ handle_dekimberlize_thread_setup() {
   while(1);
 
   fclose(fp);
+  fp = NULL;
 
   for(i=0; i<10; i++)
     if(isdigit(port_str[i]))
@@ -153,6 +155,39 @@ handle_dekimberlize_thread_setup() {
 	    "VNC service in DCM..\n");
     return -1;
   }
+
+
+  fprintf(stderr, "(display-launcher) Waiting for VM to come up..\n");
+
+  do {
+    struct timeval tv;
+    struct stat buf;
+    int err;
+
+    memset(&buf, 0, sizeof(struct stat));
+    memset(&tv, 0, sizeof(struct timeval));
+
+    err = stat("/tmp/dekimberlize.resumed", &buf);
+    if(!err) {
+      fp = fopen("/tmp/dekimberlize.resumed", "r");
+      if(fp == NULL)
+	perror("fopen");
+      else
+	fprintf(stderr, "(display-launcher) opened /tmp/dekimberlize.resumed\n", (unsigned int) buf.st_size);
+    }
+
+    /*
+     * Sleep a millisecond, waiting for our VM to come up.
+     */
+
+    tv.tv_sec = 0;
+    tv.tv_usec = 1000;
+
+    select(0, NULL, NULL, NULL, &tv);
+  }
+  while(fp == NULL);
+
+  fclose(fp);
 
   return 0;
 }

@@ -242,6 +242,7 @@ fi
 
 touch /tmp/dekimberlize.lock
 rm -f /tmp/dekimberlize_finished
+rm -f /tmp/dekimberlize.resumed
 
 
 ########################################################################
@@ -344,7 +345,7 @@ if [ $? -ne 1 ]; then
     failure
 fi
 
-touch /tmp/dekimberlize.resumed
+echo 1234 > /tmp/dekimberlize.resumed
 
 gettimeofday "dekimberlize completed resuming VM" >> /tmp/dekimberlize.log
 
