@@ -117,6 +117,64 @@ log_message(char *message) {
   return 0;
 }
 
+int
+log_append_file(char *filename) {
+  int bytes, err;
+  struct stat buf;
+  FILE *fp;
+
+  if(log_ready == 0 || log_fp == NULL || filename == NULL)
+    return -1;
+
+  memset(&buf, 0, sizeof(struct stat));
+  err = stat(filename, &buf);
+  if(err < 0) {
+    fprintf(stderr, "(common) couldn't stat log file %s\n", filename);
+    return -1;
+  }
+
+  bytes = buf.st_size;
+  fp = fopen(filename, "r");
+  if(fp == NULL) {
+    perror("(common) fopen");
+    return -1;
+  }
+
+  err = pthread_mutex_lock(&log_mutex);
+  if(err < 0) {
+    fprintf(stderr, "(common) pthread_mutex_lock returned "
+	    "error: %d\n", err);
+    fclose(fp);
+    return -1;
+  }
+
+  while(bytes > 0) {
+    int num_read;
+    char str[ARG_MAX];
+    
+    num_read = fread(str, 1, ARG_MAX, fp);
+    if(num_read <= 0) 
+      continue;
+
+    fwrite(str, num_read, 1, log_fp);
+
+    bytes-=num_read;
+  }
+
+  fflush(log_fp);
+
+  err = pthread_mutex_unlock(&log_mutex);
+  if(err < 0) {
+    fprintf(stderr, "(common) pthread_mutex_unlock returned "
+	    "error: %d\n", err);
+    fclose(fp);
+    return -1;
+  }
+
+  fclose(fp);
+
+  return 0;
+}
 
 void
 log_deinit(void) {
