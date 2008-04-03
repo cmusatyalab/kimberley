@@ -108,6 +108,8 @@ log_message(char *message) {
     return -1;
   }
 
+  fflush(log_fp);
+
   err = pthread_mutex_unlock(&log_mutex);
   if(err < 0) {
     fprintf(stderr, "(common) pthread_mutex_unlock returned "
