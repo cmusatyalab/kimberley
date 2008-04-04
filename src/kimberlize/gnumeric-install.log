@@ -1,0 +1,9 @@
+#Fri Apr  4 02:51:09 EDT 2008 : Kimberlize begin. FedoraTest/gnumeric-install/gnumeric-execute
+# Yum size: 16M
+Snapshot, VM launch: 27
+Application install and exec: 101
+Uncompressed tarball creation: 106
+Uncompressed tarball size: 520263680
+Kimberlize process: 248
+#Fri Apr  4 02:55:17 EDT 2008 : Kimberlize end.
+

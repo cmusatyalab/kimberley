@@ -67,7 +67,6 @@ sleep_until_vm_running()
 }
 
 
-
 if [ $# -lt 3 ]; then
 	usage
 	exit 1
@@ -122,6 +121,8 @@ shift $(($OPTIND-1))
 vm_name=$1
 install_script=$2
 execute_script=$3
+log_filename=$2.log
+
 
 if [ "$vm_name" = "" ]; then
 	echo "error: No VM name supplied."
@@ -141,6 +142,8 @@ if [ "$execute_script" = "" ]; then
     exit 1
 fi
 
+KIMBERLIZESTART=$(date +%s)
+echo "#`date` : Kimberlize begin. ${vm_name}/${install_script}/${execute_script}" >> ${log_filename}
 
 echo
 echo "Installing application in VM '$vm_name'.."
@@ -163,6 +166,7 @@ VBoxManage setextradata $vm_name "VBoxInternal/Devices/pcnet/0/LUN#0/Config/diam
 # later.
 #
 
+START=$(date +%s)
 echo
 echo "Snapshotting VM '$vm_name'.."
 VBoxManage snapshot $vm_name take $snapshot_name > /dev/null
@@ -193,11 +197,16 @@ echo
 echo "Sleeping 15 secs while the VM gets a network address.."
 sleep 15s
 
+END=$(date +%s)
+DIFF=$(( $END - $START ))
+echo "Snapshot, VM launch: $DIFF" >> ${log_filename}
+
 
 ########################################################################
 # Execute application installer and application inside VM
 #
 
+START=$(date +%s)
 echo
 echo "Executing install script '$install_script' inside VM.."
 install_basename=`basename $install_script`
@@ -210,7 +219,9 @@ execute_basename=`basename $execute_script`
 scp -P $login_port $execute_script $login_name@localhost:/tmp
 ssh -f -l $login_name -p $login_port localhost /tmp/$execute_basename
 sleep 5s
-
+END=$(date +%s)
+DIFF=$(( $END - $START ))
+echo "Application install and exec: $DIFF" >> ${log_filename}
 
 ########################################################################
 # XXX EXPERIMENTAL
@@ -265,6 +276,7 @@ disk_current_file="$HOME/.VirtualBox/Machines/$vm_name/Snapshots/{${disk_current
 # This can vastly reduce the amount of memory transferred.
 #
 
+START=$(date +%s)
 rm -rf /tmp/$vm_name/
 mkdir -p /tmp/$vm_name/Snapshots/
 
@@ -305,12 +317,22 @@ VBoxManage setextradata $vm_name "VBoxInternal/Devices/pcnet/0/LUN#0/Config/diam
 echo
 echo "VM returned to base state."
 
+END=$(date +%s)
+DIFF=$(( $END - $START ))
+echo "Uncompressed tarball creation: $DIFF" >> ${log_filename}
+echo "Uncompressed tarball size: `ls -l ${overlay_filename} | awk '{print $5}'`" >> ${log_filename}
+
 if [ $compression -eq 1 ]; then
     echo
+    START=$(date +%s)
     echo "Compressing VM overlay (LZMA).."
     lzcat -z $overlay_filename > ${overlay_filename}.lzma
     rm $overlay_filename
     overlay_filename=${overlay_filename}.lzma
+    END=$(date +%s)
+    DIFF=$(( $END - $START ))
+    echo "Compression: $DIFF" >> ${log_filename}
+    echo "Compressed tarball size: `ls -l ${overlay_filename} | awk '{print $5}'`" >> ${log_filename}
 else
     echo
     echo "Compression disabled, ignoring.."
@@ -319,6 +341,7 @@ fi
 
 if [ $encryption -ne 0 ]; then
     echo
+    START=$(date +%s)
     echo "Encrypting VM overlay (AES-128).."
     if [ "$encryption_keyfile" != "" ]; then
 	echo "  - Using passphrase from first line of supplied file '$encryption_keyfile'.."
@@ -330,16 +353,24 @@ if [ $encryption -ne 0 ]; then
     openssl enc -aes-128-cbc -e -pass file:$encryption_keyfile -in $overlay_filename -out ${overlay_filename}.enc
     rm $overlay_filename
     overlay_filename=${overlay_filename}.enc
+    END=$(date +%s)
+    DIFF=$(( $END - $START ))
+    echo "Encryption: $DIFF" >> ${log_filename}
 else
     echo
     echo "Encryption disabled, ignoring.."
 fi
 
-
 echo
 echo "Complete!  Your state is in the file '$overlay_filename'"
 echo "It can be renamed to whatever you like, provided the extensions remain."
 echo
+
+KIMBERLIZEEND=$(date +%s)
+KIMBERLIZEDIFF=$(( $KIMBERLIZEEND - $KIMBERLIZESTART ))
+echo "Kimberlize process: $KIMBERLIZEDIFF" >> ${log_filename}
+echo "#`date` : Kimberlize end." >> ${log_filename}
+echo "" >> ${log_filename}
 
 
 ########################################################################

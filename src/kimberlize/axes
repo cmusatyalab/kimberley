@@ -1,0 +1,8 @@
+# Compressed size:
+COMP_SIZE=`ls -l /tmp/FedoraTest-app_state.tar.lzma  | awk '{print $5}'`
+
+# Original size:
+ORIG_SIZE=`lzmainfo /tmp/FedoraTest-app_state.tar.lzma  | grep 'Uncompressed' | awk '{for(i=1; i<=NF; i++) { if ($i == "bytes)") print $(i-1)}}' | sed 's/^.//g'`
+
+RATIO=`echo "$ORIG_SIZE / $COMP_SIZE" | bc`
+

@@ -1,0 +1,6 @@
+#Fri Apr  4 02:42:48 EDT 2008 : Kimberlize begin. FedoraTest/abiword-install/abiword-execute
+# yum  Abiword size: 10M
+Snapshot, VM launch: 25
+Application install and exec: 70
+Uncompressed tarball creation: 77
+Uncompressed tarball size: 328427520

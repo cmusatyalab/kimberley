@@ -1,0 +1,3 @@
+VBoxManage setextradata FedoraTest "VBoxInternal/Devices/pcnet/0/LUN#0/Config/diamond_ssh/HostPort" 2222
+VBoxManage setextradata FedoraTest "VBoxInternal/Devices/pcnet/0/LUN#0/Config/diamond_ssh/GuestPort" 22
+VBoxManage setextradata FedoraTest "VBoxInternal/Devices/pcnet/0/LUN#0/Config/diamond_ssh/Protocol" TCP
