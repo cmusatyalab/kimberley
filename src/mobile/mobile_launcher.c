@@ -423,7 +423,7 @@ main(int argc, char *argv[])
 
   fprintf(stderr, "(mobile-launcher) DBus calling into dcm for RPC conn..\n");
 
-  log_message("mobile launcher requesting service discovery from DCM..");
+  log_message("mobile launcher establishing connection to display through DCM");
 
   if(!edu_cmu_cs_diamond_opendiamond_dcm_client(dbus_proxy, 
 						LAUNCHER_DCM_SERVICE_NAME, 
@@ -435,7 +435,6 @@ main(int argc, char *argv[])
     goto cleanup;
   }
 
-  log_message("mobile launcher completed request for service discovery");
 
   fprintf(stderr, "(mobile-launcher) DCM client() returned port: %d\n", 
 	  g_rpc_port);
@@ -444,8 +443,6 @@ main(int argc, char *argv[])
   /* Create new loopback connection to the Sun RPC server on the
    * port that it indicated in the D-Bus message. */
   
-  log_message("mobile launcher connecting to DCM");
-
   if((connfd = socket(AF_INET, SOCK_STREAM, 0)) < 0) {
     perror("socket");
     ret = EXIT_FAILURE;
@@ -472,13 +469,9 @@ main(int argc, char *argv[])
     goto cleanup;
   }
 
-  log_message("mobile launcher completed connecting to DCM");
-  
   fprintf(stderr, "(mobile-launcher) successfully connected. bringing up "
 	  "launcher..\n");
   
-
-  log_message("mobile launcher establishing connection to display");
 
   clnt = convert_socket_to_rpc_client(connfd, MOBILELAUNCHER_PROG, 
 				      MOBILELAUNCHER_VERS);

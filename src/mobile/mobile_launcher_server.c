@@ -268,6 +268,8 @@ load_vm_from_url_1_svc(char *vm_name, char *patch_URL, int *result,  struct svc_
   snprintf(arg, PATH_MAX, "-i %s ", current_state.overlay_location);
   strncat(command, arg, PATH_MAX);
 
+  strncat(command, vm_name, PATH_MAX);
+
   *result = handle_dekimberlize_thread_setup();
 
   
