@@ -408,7 +408,7 @@ echo "The user has ended the session."
 ## machine is running.
 #
 
-if [ $floppy_original != "" ]; then
+if [ "$floppy_original" != "" ]; then
     echo
     echo "Detaching floppy disk from VM.."
 
@@ -452,7 +452,7 @@ gettimeofday "dekimberlize completed powering down VM" >> /tmp/dekimberlize.log
 ## of attachment).
 #
 
-if [ $floppy_original != "" ]; then
+if [ "$floppy_original" != "" ]; then
     echo
     echo "Unregistering floppy disk with VirtualBox.."
 
