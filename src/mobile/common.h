@@ -21,6 +21,9 @@ int            log_message(char *message);
 int            log_append_file(char *filename);
 void           log_deinit(void);
 
+int            compress_file(char *filename, char *new_filename);
+int            decompress_file(char *filename, char *new_filename);
+
 CLIENT *       convert_socket_to_rpc_client(int connfd, 
 					    unsigned int prog,
 					    unsigned int vers);

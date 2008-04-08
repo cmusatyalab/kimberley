@@ -592,3 +592,58 @@ convert_socket_to_rpc_client(int connfd, unsigned int prog,
   
   return clnt;
 }
+
+
+int
+compress_file(char *filename, char *new_filename) {
+  int err;
+  char command[ARG_MAX];
+  char nf[PATH_MAX];
+
+  if(filename == NULL || strlen(filename) <= 0)
+    return -1;
+  
+
+  snprintf(nf, PATH_MAX, "%s.gz", filename);
+
+  snprintf(command, ARG_MAX, "gzip -c -9 %s > %s", filename, nf);
+  err = system(command);
+  if(err < 0) {
+    perror("system");
+    return -1;
+  }
+
+  if(new_filename != NULL)
+    strcpy(new_filename, nf);
+
+  return 0;
+}
+
+
+
+int
+decompress_file(char *filename, char *new_filename) {
+  int err;
+  char command[ARG_MAX];
+
+  if(filename == NULL || strlen(filename) <= 0)
+    return -1;
+  
+  snprintf(command, ARG_MAX, "gunzip %s", filename);
+  err = system(command);
+  if(err < 0) {
+    perror("system");
+    return -1;
+  }
+
+  if(new_filename != NULL) {
+    int len;
+
+    strncpy(new_filename, filename, PATH_MAX);
+    len = strlen(filename);
+    new_filename[len-3] = '\0'; //remove .gz extension
+  }
+
+
+  return 0;
+}

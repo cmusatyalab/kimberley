@@ -274,6 +274,7 @@ establish_thin_client_connection(DBusGProxy *dbus_proxy) {
 
   return ret;
 }
+
 	  
 
 int
@@ -294,6 +295,7 @@ main(int argc, char *argv[])
   char *vm;
   char *overlay_path = NULL;
   char *floppy_path = NULL;
+  char floppy_compressed_path[PATH_MAX];
   char *encryption_key_path = NULL;
 
   char logmsg[ARG_MAX];
@@ -337,11 +339,15 @@ main(int argc, char *argv[])
 
       {
 	char command[ARG_MAX];
-
-	fprintf(stderr, "(mobile-launcher) unmounting floppy..\n");
+  
+	log_message("mobile launcher unmounting floppy..");
 
 	snprintf(command, ARG_MAX, "umount %s", floppy_path);
 	system(command);
+
+	log_message("mobile launcher compressing floppy..");
+	compress_file(floppy_path, floppy_compressed_path);
+	log_message("mobile launcher completed compressing floppy..");
       }
 
       break;
@@ -515,15 +521,15 @@ main(int argc, char *argv[])
   if(floppy_path != NULL) {
     fprintf(stderr, "(mobile-launcher) Sending floppy disk image..\n");
     
-    log_message("mobile launcher sending floppy disk");
-    if(send_file_in_pieces(floppy_path, clnt) < 0) {
-      fprintf(stderr, "(mobile-launcher) failed sending floppy disk image file\n");
+    log_message("mobile launcher sending compressed floppy disk");
+    if(send_file_in_pieces(floppy_compressed_path, clnt) < 0) {
+      fprintf(stderr, "(mobile-launcher) failed sending compressed floppy disk image file\n");
       floppy_path = NULL;
     }
     else {
       log_message("mobile launcher completed sending floppy disk");
       log_message("mobile launcher indicating floppy disk filename");
-      retval = use_persistent_state_1(floppy_path, &err, clnt);
+      retval = use_persistent_state_1(floppy_compressed_path, &err, clnt);
       if (retval != RPC_SUCCESS) {
 	fprintf(stderr, "(mobile-launcher) setting persistent state file "
 		"failed: %s\n", clnt_sperrno(retval));

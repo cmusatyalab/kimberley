@@ -586,9 +586,13 @@ use_persistent_state_1_svc(char *filename, int *result,  struct svc_req *rqstp)
 {
   int err;
   char *bname, *copy;
+  char command[ARG_MAX];
+  char local_filename[PATH_MAX];
 
   copy = strdup(filename);
   bname = basename(copy);
+  snprintf(local_filename, PATH_MAX, "/tmp/%s", bname);
+
 
   err = pthread_mutex_lock(&current_state.mutex);
   if(err < 0) {
@@ -598,13 +602,15 @@ use_persistent_state_1_svc(char *filename, int *result,  struct svc_req *rqstp)
     *result = -1;
     return FALSE;
   }
-  
-  snprintf(current_state.persistent_state_filename, PATH_MAX, 
-	   "/tmp/%s", bname);
+
+  fprintf(stderr, "(display-launcher) Decompressing persistent state %s..\n",
+	  local_filename);
+
+  decompress_file(local_filename, current_state.persistent_state_filename);
   snprintf(current_state.persistent_state_modified_filename, PATH_MAX, 
-	   "/tmp/%s.new", bname);
+	   "%s.new", current_state.persistent_state_filename);
   snprintf(current_state.persistent_state_diff_filename, PATH_MAX, 
-	   "/tmp/%s.diff", bname);
+	   "%s.diff", current_state.persistent_state_filename);
 
   err = pthread_mutex_unlock(&current_state.mutex);
   if(err < 0) {
