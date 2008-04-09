@@ -1,0 +1,42 @@
+#!/bin/sh
+
+
+########################################################################
+# install packages and dependencies
+#
+
+wget -O /tmp/opencv1-1.0.0-2.i386.rpm http://solitaire.diamond.cs.cmu.edu/opencv1-1.0.0-2.i386.rpm
+wget -O /tmp/opendiamond-3.2.1-2.i386.rpm http://solitaire.diamond.cs.cmu.edu/opendiamond-3.2.1-2.i386.rpm
+wget -O /tmp/snapfind-1.2.5-2.i386.rpm http://solitaire.diamond.cs.cmu.edu/snapfind-1.2.5-2.i386.rpm
+
+#sudo apt-get -y update
+
+sudo rpm -Uvh /tmp/opencv1-1.0.0-2.i386.rpm
+sudo rpm -Uvh /tmp/opendiamond-3.2.1-2.i386.rpm
+sudo rpm -Uvh /tmp/snapfind-1.2.5-2.i386.rpm
+
+#sudo apt-get -f -y install 
+#sudo apt-get -y install g++
+
+
+########################################################################
+# Setup initial Diamond state
+#
+
+mkdir -p ~/.diamond/
+
+wget -O ~/.diamond/name_map http://solitaire.diamond.cs.cmu.edu/snapfind_name_map
+wget -O ~/.diamond/gid_map http://solitaire.diamond.cs.cmu.edu/snapfind_gid_map
+
+echo "DATAROOT $HOME" > ~/.diamond/diamond_config
+echo "INDEXDIR $HOME" >> ~/.diamond/diamond_config
+echo "CACHEDIR $HOME" >> ~/.diamond/diamond_config
+echo "DATATYPE NATIVE" >> ~/.diamond/diamond_config
+
+
+########################################################################
+# Setup initial SnapFind state
+#
+
+mkdir -p ~/.diamond/snapfind/
+echo "PLUGIN_DIR      /usr/local/diamond/lib" > ~/.diamond/snapfind/snapfindrc
