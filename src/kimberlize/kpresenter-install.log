@@ -1,9 +1,0 @@
-#Fri Apr  4 03:03:47 EDT 2008 : Kimberlize begin. FedoraTest/kpresenter-install/kpresenter-execute
-# yum reports: 9.1M
-Snapshot, VM launch: 26
-Application install and exec: 80
-Uncompressed tarball creation: 95
-Uncompressed tarball size: 449955840
-Kimberlize process: 216
-#Fri Apr  4 03:07:23 EDT 2008 : Kimberlize end.
-

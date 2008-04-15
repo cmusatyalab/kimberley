@@ -21,7 +21,7 @@
 usage()
 {
     echo "usage: kimberlize [-e [-k encryption-key-file]] [-l login-name] [-p port] [-n]"
-    echo "                    <vm-name> <install-script> <execute-script>"
+    echo "                    <vm-name> <app-name> <install-script> <execute-script>"
 }
 
 
@@ -119,8 +119,9 @@ done
 shift $(($OPTIND-1))
 
 vm_name=$1
-install_script=$2
-execute_script=$3
+app_name=$2
+install_script=$3
+execute_script=$4
 log_filename=$2.log
 
 
@@ -291,8 +292,8 @@ scp $disk_current_file /tmp/$vm_name/Snapshots/
 scp $HOME/.VirtualBox/Machines/$vm_name/$vm_name.xml /tmp/$vm_name/$vm_name.xml
 scp $HOME/.VirtualBox/VirtualBox.xml /tmp/$vm_name/VirtualBox.xml
 
-tar cf /tmp/${vm_name}-app_state.tar -C /tmp $vm_name
-overlay_filename="/tmp/${vm_name}-app_state.tar"
+tar cf /tmp/${vm_name}-${app_name}.tar -C /tmp $vm_name
+overlay_filename="/tmp/${vm_name}-${app_name}.tar"
 
 ls -lR /tmp/$vm_name
 rm -rf /tmp/$vm_name
