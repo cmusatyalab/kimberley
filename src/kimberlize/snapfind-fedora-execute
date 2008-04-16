@@ -1,4 +1,4 @@
 #!/bin/sh
 
 # execute application
-DISPLAY=:0.0 LD_LIBRARY_PATH=/usr/local/lib nohup /usr/local/diamond/bin/snapfind 
+DISPLAY=:0.0 LD_LIBRARY_PATH=/usr/local/lib nohup /usr/local/diamond/bin/snapfind

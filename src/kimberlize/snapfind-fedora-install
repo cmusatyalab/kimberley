@@ -5,18 +5,11 @@
 # install packages and dependencies
 #
 
-wget -O /tmp/opencv1-1.0.0-2.i386.rpm http://solitaire.diamond.cs.cmu.edu/opencv1-1.0.0-2.i386.rpm
-wget -O /tmp/opendiamond-3.2.1-2.i386.rpm http://solitaire.diamond.cs.cmu.edu/opendiamond-3.2.1-2.i386.rpm
-wget -O /tmp/snapfind-1.2.5-2.i386.rpm http://solitaire.diamond.cs.cmu.edu/snapfind-1.2.5-2.i386.rpm
+wget -O /tmp/opendiamond-3.3.0-1.i386.rpm http://solitaire.diamond.cs.cmu.edu/opendiamond-3.3.0-1.i386.rpm
+wget -O /tmp/snapfind-1.2.6.tar.gz http://solitaire.diamond.cs.cmu.edu/snapfind-1.2.6.tar.gz
 
-#sudo apt-get -y update
-
-sudo rpm -Uvh /tmp/opencv1-1.0.0-2.i386.rpm
-sudo rpm -Uvh /tmp/opendiamond-3.2.1-2.i386.rpm
-sudo rpm -Uvh /tmp/snapfind-1.2.5-2.i386.rpm
-
-#sudo apt-get -f -y install 
-#sudo apt-get -y install g++
+sudo rpm -Uvh /tmp/opendiamond-3.3.0-1.i386.rpm
+sudo tar -xzf /tmp/snapfind-1.2.6.tar.gz -C /
 
 
 ########################################################################
