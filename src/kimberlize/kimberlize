@@ -219,7 +219,8 @@ echo "Executing application script '$execute_script' inside VM.."
 execute_basename=`basename $execute_script`
 scp -P $login_port $execute_script $login_name@localhost:/tmp
 ssh -f -l $login_name -p $login_port localhost /tmp/$execute_basename
-sleep 5s
+sleep 7s
+ssh -f -l $login_name -p $login_port localhost 'sync'
 END=$(date +%s)
 DIFF=$(( $END - $START ))
 echo "Application install and exec: $DIFF" >> ${log_filename}
@@ -285,6 +286,7 @@ echo
 echo "Taking the delta between current in-memory state and the checkpoint's.."
 xdelta delta -0 $mem_snapshot_file $mem_current_file /tmp/$vm_name/Snapshots/${mem_snapshot_uuid}.diff
 
+
 echo
 echo "Taking the delta between current disk image and the checkpoint's.."
 scp $disk_current_file /tmp/$vm_name/Snapshots/
@@ -294,6 +296,9 @@ scp $HOME/.VirtualBox/VirtualBox.xml /tmp/$vm_name/VirtualBox.xml
 
 tar cf /tmp/${vm_name}-${app_name}.tar -C /tmp $vm_name
 overlay_filename="/tmp/${vm_name}-${app_name}.tar"
+
+echo "Mem  diff (.diff) size: `ls -l  /tmp/$vm_name/Snapshots/${mem_snapshot_uuid}.diff | awk '{print $5}'` " >> ${log_filename}
+echo "Disk diff (.vdi)  size: `ls -l  $disk_current_file | awk '{print $5}'` " >> ${log_filename}
 
 ls -lR /tmp/$vm_name
 rm -rf /tmp/$vm_name
