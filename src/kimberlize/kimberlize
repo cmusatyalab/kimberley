@@ -220,7 +220,7 @@ execute_basename=`basename $execute_script`
 scp -P $login_port $execute_script $login_name@localhost:/tmp
 ssh -f -l $login_name -p $login_port localhost /tmp/$execute_basename
 sleep 7s
-ssh -f -l $login_name -p $login_port localhost 'sync'
+#ssh -f -l $login_name -p $login_port localhost 'sync'
 END=$(date +%s)
 DIFF=$(( $END - $START ))
 echo "Application install and exec: $DIFF" >> ${log_filename}
