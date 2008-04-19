@@ -1,0 +1,5 @@
+#!/bin/sh
+
+# execute application
+cd /tmp/pathfind
+DISPLAY=:0.0 LD_LIBRARY_PATH=/usr/local/lib nohup ./pathfind
