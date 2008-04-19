@@ -1,44 +1,44 @@
 # rm *.log
 
-./kimberlize null null-install null-execute
-./kimberlize null null-install null-execute
-./kimberlize null null-install null-execute
-./kimberlize null null-install null-execute
-./kimberlize null null-install null-execute
+./kimberlize -e null null-install null-execute
+./kimberlize -e null null-install null-execute
+./kimberlize -e null null-install null-execute
+./kimberlize -e null null-install null-execute
+./kimberlize -e null null-install null-execute
 
-./kimberlize abiword abiword-install abiword-execute
-./kimberlize abiword abiword-install abiword-execute
-./kimberlize abiword abiword-install abiword-execute
-./kimberlize abiword abiword-install abiword-execute
-./kimberlize abiword abiword-install abiword-execute
+./kimberlize -e abiword abiword-install abiword-execute
+./kimberlize -e abiword abiword-install abiword-execute
+./kimberlize -e abiword abiword-install abiword-execute
+./kimberlize -e abiword abiword-install abiword-execute
+./kimberlize -e abiword abiword-install abiword-execute
 
-./kimberlize gnumeric gnumeric-install gnumeric-execute
-./kimberlize gnumeric gnumeric-install gnumeric-execute
-./kimberlize gnumeric gnumeric-install gnumeric-execute
-./kimberlize gnumeric gnumeric-install gnumeric-execute
-./kimberlize gnumeric gnumeric-install gnumeric-execute
+./kimberlize -e gnumeric gnumeric-install gnumeric-execute
+./kimberlize -e gnumeric gnumeric-install gnumeric-execute
+./kimberlize -e gnumeric gnumeric-install gnumeric-execute
+./kimberlize -e gnumeric gnumeric-install gnumeric-execute
+./kimberlize -e gnumeric gnumeric-install gnumeric-execute
 
-./kimberlize kpresenter kpresenter-install kpresenter-execute
-./kimberlize kpresenter kpresenter-install kpresenter-execute
-./kimberlize kpresenter kpresenter-install kpresenter-execute
-./kimberlize kpresenter kpresenter-install kpresenter-execute
-./kimberlize kpresenter kpresenter-install kpresenter-execute
+./kimberlize -e kpresenter kpresenter-install kpresenter-execute
+./kimberlize -e kpresenter kpresenter-install kpresenter-execute
+./kimberlize -e kpresenter kpresenter-install kpresenter-execute
+./kimberlize -e kpresenter kpresenter-install kpresenter-execute
+./kimberlize -e kpresenter kpresenter-install kpresenter-execute
 
-./kimberlize gimp gimp-install gimp-execute
-./kimberlize gimp gimp-install gimp-execute
-./kimberlize gimp gimp-install gimp-execute
-./kimberlize gimp gimp-install gimp-execute
-./kimberlize gimp gimp-install gimp-execute
+./kimberlize -e gimp gimp-install gimp-execute
+./kimberlize -e gimp gimp-install gimp-execute
+./kimberlize -e gimp gimp-install gimp-execute
+./kimberlize -e gimp gimp-install gimp-execute
+./kimberlize -e gimp gimp-install gimp-execute
 
-./kimberlize pathfind pathfind-install pathfind-execute
-./kimberlize pathfind pathfind-install pathfind-execute
-./kimberlize pathfind pathfind-install pathfind-execute
-./kimberlize pathfind pathfind-install pathfind-execute
-./kimberlize pathfind pathfind-install pathfind-execute
+./kimberlize -e pathfind pathfind-install pathfind-execute
+./kimberlize -e pathfind pathfind-install pathfind-execute
+./kimberlize -e pathfind pathfind-install pathfind-execute
+./kimberlize -e pathfind pathfind-install pathfind-execute
+./kimberlize -e pathfind pathfind-install pathfind-execute
 
-./kimberlize snapfind snapfind-fedora-install snapfind-fedora-execute
-./kimberlize snapfind snapfind-fedora-install snapfind-fedora-execute
-./kimberlize snapfind snapfind-fedora-install snapfind-fedora-execute
-./kimberlize snapfind snapfind-fedora-install snapfind-fedora-execute
-./kimberlize snapfind snapfind-fedora-install snapfind-fedora-execute
+./kimberlize -e snapfind snapfind-fedora-install snapfind-fedora-execute
+./kimberlize -e snapfind snapfind-fedora-install snapfind-fedora-execute
+./kimberlize -e snapfind snapfind-fedora-install snapfind-fedora-execute
+./kimberlize -e snapfind snapfind-fedora-install snapfind-fedora-execute
+./kimberlize -e snapfind snapfind-fedora-install snapfind-fedora-execute
 
