@@ -1,12 +1,5 @@
 bin_PROGRAMS = display_launcher mobile_launcher gettimeofday
-bin_SCRIPTS = display_setup 
-
-BUILT_SOURCES = \
-	rpc_mobile_launcher_clnt.c rpc_mobile_launcher_svc.c \
-	rpc_mobile_launcher_xdr.c rpc_mobile_launcher.x rpc_mobile_launcher.h \
-	kcm_dbus_app_glue.h
-
-CLEANFILES = $(BUILT_SOURCES)
+bin_SCRIPTS = display_setup
 
 display_launcher_SOURCES = display_launcher.c display_launcher.h \
 	mobile_launcher_server.c rpc_mobile_launcher.x.in kcm.xml \
@@ -20,6 +13,15 @@ mobile_launcher_SOURCES = mobile_launcher.c \
 	rpc_mobile_launcher_clnt.c rpc_mobile_launcher_xdr.c rpc_mobile_launcher.h
 
 gettimeofday_SOURCES = gettimeofday.c
+
+BUILT_SOURCES = \
+	rpc_mobile_launcher_clnt.c rpc_mobile_launcher_svc.c \
+	rpc_mobile_launcher_xdr.c rpc_mobile_launcher.x rpc_mobile_launcher.h \
+	kcm_dbus_app_glue.h
+
+CLEANFILES = $(BUILT_SOURCES)
+CPPFLAGS = $(DBUS_GLIB_CFLAGS)
+LDADD = $(DBUS_GLIB_LIBS)
 
 rpc_%_xdr.c: rpc_%.x
 	$(RM) $@
