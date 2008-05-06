@@ -114,7 +114,7 @@ send_file_in_pieces(char *path, CLIENT *clnt) {
     return -1;
 
   memset(&buf, 0, sizeof(struct stat));
-  
+
   ret = stat(path, &buf);
   if(ret < 0) {
     perror("stat");
@@ -127,7 +127,7 @@ send_file_in_pieces(char *path, CLIENT *clnt) {
     return -1;
   }
 
-  n = (int) ceilf(((float)buf.st_size)/((float)CHUNK_SIZE));
+  n = (buf.st_size + CHUNK_SIZE - 1) / CHUNK_SIZE;
   fprintf(stderr, "(mobile-launcher) Transfer of %s (size=%d) will take %d"
 	  " RPCs.\n", path, (int) buf.st_size, n);
 
@@ -138,7 +138,7 @@ send_file_in_pieces(char *path, CLIENT *clnt) {
   if(retval != RPC_SUCCESS) {
     clnt_perror (clnt, "send_file RPC call failed");
     return -1;
-  }  
+  }
 
   log_message("mobile launcher completed send request");
 
@@ -203,7 +203,7 @@ retrieve_file_in_pieces(char *path, CLIENT *clnt) {
   snprintf(logmsg, ARG_MAX, "mobile launcher completed request for retrieval of file, size: %d", size);
   log_message(logmsg);
 
-  n = (int) ceilf(((float)size)/((float)CHUNK_SIZE));
+  n = (size + CHUNK_SIZE - 1) / CHUNK_SIZE;
   fprintf(stderr, "(mobile-launcher) Transfer of %s (size=%d) will take %d"
 	  " RPCs.\n", path, (int) size, n);
 

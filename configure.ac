@@ -34,8 +34,6 @@ AC_SEARCH_LIBS([pthread_create],
 	[pthread],, AC_MSG_FAILURE([cannot find pthread_create function]))
 AC_SEARCH_LIBS([OpenSSL_add_all_digests],
 	[ssl],, AC_MSG_FAILURE([cannot find ssl function]))
-AC_SEARCH_LIBS([ceilf],
-    [m],, AC_MSG_FAILURE([cannot find ceilf function]))
 
 # some options and includes
 AC_SUBST(AM_CPPFLAGS, ['-D_REENTRANT'])
