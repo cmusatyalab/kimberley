@@ -527,12 +527,12 @@ main(int argc, char *argv[])
   log_message("mobile launcher calculating latency");
 
   ms = determine_rtt(clnt);
-  if(ms > 1000) {
-    fprintf(stderr, "(mobile-launcher) Connection is slower than 1000ms\n");
+  if(ms > 100) {
+    fprintf(stderr, "(mobile-launcher) Connection is slower than 100ms\n");
     //use_USB = ask_user_for_USB();
   }
   else {
-    fprintf(stderr, "(mobile-launcher) Connection is faster than 1000ms\n");
+    fprintf(stderr, "(mobile-launcher) Connection is faster than 100ms\n");
   }
 
   snprintf(logmsg, ARG_MAX, "mobile launcher completed calculating latency: %u ms", ms);
