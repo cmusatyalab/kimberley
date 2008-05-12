@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<node name="/edu/cmu/cs/kimberley/kcm">
+  <interface name="edu.cmu.cs.kimberley.kcm">
+
+    <method name="sense">
+      <arg type="as" name="interfaces"   direction="out"  />
+    </method>
+
+    <method name="publish">
+      <arg type="s"  name="service_name" direction="in"  />
+      <arg type="i"  name="interfaces"   direction="in"  />
+      <arg type="u"  name="port"         direction="in"  />
+    </method>
+
+    <method name="browse">
+      <arg type="s"  name="service_name" direction="in"  />
+      <arg type="i"  name="interfaces"   direction="in"  />
+      <arg type="u"  name="port"         direction="out" />
+    </method>
+
+  </interface>
+
+</node>
