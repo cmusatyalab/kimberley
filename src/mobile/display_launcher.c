@@ -11,7 +11,7 @@
 #include <dbus/dbus-glib-bindings.h>
 #include <glib.h>
 
-#include "dcm_dbus_app_glue.h"
+#include "kcm_dbus_app_glue.h"
 #include "rpc_mobile_launcher.h"
 #include "display_launcher.h"
 #include "common.h"
@@ -96,10 +96,11 @@ int
 create_dcm_service(char *name, unsigned short port) {
     DBusGProxy *dbus_proxy = NULL;
     GError *gerr = NULL;
-    int ret = 0;
+    int ret = 0, i;
     gchar *gname;
     guint gport;
-
+    gchar **interface_strs = NULL;
+    gint interface = -1;
 
     if(name == NULL) {
       fprintf(stderr, "(display-launcher) bad args to create_dcm_service\n");
@@ -129,23 +130,41 @@ create_dcm_service(char *name, unsigned short port) {
 					   DCM_DBUS_SERVICE_NAME);
     
     fprintf(stderr, "(display-launcher) DBus proxy calling into "
-	    "DCM (name=%s, port=%u)..\n", name, port);
-    
-    /* Signal DCM that a service is ready to accept new connections.
-     * The method call will trigger activation.  In other words,
-     * if the DCM is not running before this call is made, it will be
-     * afterwards, assuming service files are installed correctly. */
+	    "KCM (name=%s, port=%u)..\n", name, port);
 
-    gname = name;
-    gport = port;
-    if(!edu_cmu_cs_diamond_opendiamond_dcm_server(dbus_proxy, name,
-						  gport, &gerr)) {
-      if(gerr != NULL)
-        g_warning("server() method failed: %s", gerr->message);
+    fprintf(stderr, "(example-server) dbus proxy making call (sense)..\n");
+    
+    /* The method call will trigger activation. */
+    if(!edu_cmu_cs_kimberley_kcm_sense(dbus_proxy, &interface_strs, &gerr)) {
+      /* Method failed, the GError is set, let's warn everyone */
+      g_warning("(example-server) kcm->sense() method failed: %s", 
+		gerr->message);
+      g_error_free(gerr);
       ret = -1;
       goto cleanup;
     }
-
+    
+    if(interface_strs != NULL) {
+      fprintf(stderr, "(example-server) Found some interfaces:\n");
+      for(i=0; interface_strs[i] != NULL; i++)
+	fprintf(stderr, "\t%d: %s\n", i, interface_strs[i]);
+      fprintf(stderr, "\n");
+    }
+    
+    fprintf(stderr, "(example-server) dbus proxy making call (publish)..\n");
+    
+    gport = port;
+    
+    if(!edu_cmu_cs_kimberley_kcm_publish(dbus_proxy, name, interface, 
+					 gport, &gerr)) {
+      if(gerr != NULL) {
+	g_warning("server() method failed: %s", gerr->message);
+	g_error_free(gerr);
+      }
+      ret = -1;
+      goto cleanup;
+    }
+    
 
  cleanup:
 

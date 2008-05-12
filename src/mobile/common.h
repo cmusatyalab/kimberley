@@ -3,10 +3,10 @@
 
 #include <rpc/rpc.h>
 
-#define DCM_DBUS_SERVICE_NAME		"edu.cmu.cs.diamond.opendiamond.dcm"
-#define DCM_DBUS_SERVICE_PATH		"/edu/cmu/cs/diamond/opendiamond/dcm"
-#define LAUNCHER_DCM_SERVICE_NAME	"_launcher_dcm._tcp"
-#define VNC_DCM_SERVICE_NAME		"_vnc_dcm._tcp"
+#define DCM_DBUS_SERVICE_NAME		"edu.cmu.cs.kimberley.kcm"
+#define DCM_DBUS_SERVICE_PATH		"/edu/cmu/cs/kimberley/kcm"
+#define LAUNCHER_DCM_SERVICE_NAME	"_launcher_kcm._tcp"
+#define VNC_DCM_SERVICE_NAME		"_vnc_kcm._tcp"
 
 
 /*

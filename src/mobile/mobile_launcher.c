@@ -16,7 +16,7 @@
 #include <dbus/dbus-glib-bindings.h>
 #include <glib.h>
 
-#include "dcm_dbus_app_glue.h"
+#include "kcm_dbus_app_glue.h"
 #include "rpc_mobile_launcher.h"
 #include "common.h"
 
@@ -243,7 +243,8 @@ retrieve_file_in_pieces(char *path, CLIENT *clnt) {
 int
 establish_thin_client_connection(DBusGProxy *dbus_proxy) {
   int i, ret;
-  guint g_vnc_port = 0;
+  guint gport = 0;
+  gint interface = -1;
   GError *gerr = NULL;
 
 
@@ -253,21 +254,24 @@ establish_thin_client_connection(DBusGProxy *dbus_proxy) {
   ret = -1;
 
   for(i=0; i<AVAHI_TIMEOUT; i++) {
-    if(!edu_cmu_cs_diamond_opendiamond_dcm_client(dbus_proxy, 
-						  VNC_DCM_SERVICE_NAME, 
-						  &g_vnc_port, &gerr)) {
+
+    if(!edu_cmu_cs_kimberley_kcm_browse(dbus_proxy, 
+					VNC_DCM_SERVICE_NAME, 
+					interface, 
+					&gport, 
+					&gerr)) {
       struct timeval tv;
 
       tv.tv_sec = 1;
       tv.tv_usec = 0;
 
-      g_warning("(mobile-launcher) dcm->client() method failed: %s", 
+      g_warning("(mobile-launcher) dcm->browse() method failed: %s", 
 		gerr->message);
       
       select(0, NULL, NULL, NULL, &tv);
     }
     else {
-      ret = g_vnc_port;
+      ret = gport;
       break;
     }
   }
@@ -283,10 +287,11 @@ main(int argc, char *argv[])
   DBusGConnection *dbus_conn;
   DBusGProxy *dbus_proxy = NULL;
   GError *gerr = NULL;
-  guint g_rpc_port = 0;
-  int err, ret = EXIT_SUCCESS, opt;
+  guint gport = 0;
+  gchar **interface_strs = NULL;
+  gint interface = -1;
+  int err, ret = EXIT_SUCCESS, opt, i;
   int vnc_port;
-  int use_USB = 0;
   char port_str[NI_MAXSERV];
   struct addrinfo *info = NULL, hints;
   enum clnt_stat retval;
@@ -420,6 +425,7 @@ main(int argc, char *argv[])
 	
   log_message("mobile launcher completed connecting to DBUS..");
 	
+
   /*
    * Signal DCM that you would like it to search for an RPC service.
    * The method call will trigger activation.  In other words,
@@ -427,23 +433,42 @@ main(int argc, char *argv[])
    * afterwards, assuming service files are installed correctly. 
    */
 
-  fprintf(stderr, "(mobile-launcher) DBus calling into dcm for RPC conn..\n");
+  fprintf(stderr, "(mobile-launcher) DBus calling into kcm (sense)..\n");
 
-  log_message("mobile launcher establishing connection to display through DCM");
-
-  if(!edu_cmu_cs_diamond_opendiamond_dcm_client(dbus_proxy, 
-						LAUNCHER_DCM_SERVICE_NAME, 
-						&g_rpc_port, &gerr)) {
+  /* The method call will trigger activation, more on that later */
+  if(!edu_cmu_cs_kimberley_kcm_sense(dbus_proxy, &interface_strs, &gerr)) {
     /* Method failed, the GError is set, let's warn everyone */
-    g_warning("(mobile-launcher) dcm->client() method failed: %s", 
+    g_warning("(mobile-launcher) kcm->sense() method failed: %s", 
+	      gerr->message);
+    ret = EXIT_FAILURE;
+    goto cleanup;
+  }
+
+  if(interface_strs != NULL) {
+    fprintf(stderr, "(mobile-launcher) Found some interfaces:\n");
+    for(i=0; interface_strs[i] != NULL; i++)
+      fprintf(stderr, "\t%d: %s\n", i, interface_strs[i]);
+    fprintf(stderr, "\n");
+  }
+
+
+  fprintf(stderr, "(mobile-launcher) DBus calling into kcm (browse)..\n");
+
+  if(!edu_cmu_cs_kimberley_kcm_browse(dbus_proxy, 
+				      LAUNCHER_DCM_SERVICE_NAME, 
+				      interface, 
+				      &gport, 
+				      &gerr)) {
+    /* Method failed, the GError is set, let's warn everyone */
+    g_warning("(mobile-launcher) kcm->browse() method failed: %s", 
 	      gerr->message);
     ret = EXIT_FAILURE;
     goto cleanup;
   }
 
 
-  fprintf(stderr, "(mobile-launcher) DCM client() returned port: %d\n", 
-	  g_rpc_port);
+  fprintf(stderr, "(mobile-launcher) KCM browse() returned port: %d\n", 
+	  gport);
   
   
   /* Create new loopback connection to the Sun RPC server on the
@@ -459,7 +484,7 @@ main(int argc, char *argv[])
   hints.ai_flags = AI_CANONNAME;
   hints.ai_family = AF_INET;
   hints.ai_socktype = SOCK_STREAM;
-  snprintf(port_str, 6, "%u", g_rpc_port);
+  snprintf(port_str, 6, "%u", gport);
   
   if((err = getaddrinfo("localhost", port_str, &hints, &info)) < 0) {
     fprintf(stderr, "getaddrinfo: %s\n", gai_strerror(err));

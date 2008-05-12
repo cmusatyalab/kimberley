@@ -4,18 +4,18 @@ bin_SCRIPTS = display_setup
 BUILT_SOURCES = \
 	rpc_mobile_launcher_clnt.c rpc_mobile_launcher_svc.c \
 	rpc_mobile_launcher_xdr.c rpc_mobile_launcher.x rpc_mobile_launcher.h \
-	dcm_dbus_app_glue.h
+	kcm_dbus_app_glue.h
 
 CLEANFILES = $(BUILT_SOURCES)
 
 display_launcher_SOURCES = display_launcher.c display_launcher.h \
-	mobile_launcher_server.c rpc_mobile_launcher.x.in dcm.xml \
+	mobile_launcher_server.c rpc_mobile_launcher.x.in kcm.xml \
 	common.c common.h \
 	rpc_mobile_launcher_svc.c rpc_mobile_launcher_xdr.c rpc_mobile_launcher.h
 
 
 mobile_launcher_SOURCES = mobile_launcher.c \
-	rpc_mobile_launcher.x.in dcm.xml \
+	rpc_mobile_launcher.x.in kcm.xml \
 	common.c common.h \
 	rpc_mobile_launcher_clnt.c rpc_mobile_launcher_xdr.c rpc_mobile_launcher.h
 
@@ -40,6 +40,6 @@ rpc_%_clnt.c: rpc_%.x
 %.x: %.x.in
 	cp $< $@
 
-dcm_dbus_app_glue.h: dcm.xml
+kcm_dbus_app_glue.h: kcm.xml
 	$(RM) $@
 	dbus-binding-tool --mode=glib-client --prefix=dcm $< > $@
