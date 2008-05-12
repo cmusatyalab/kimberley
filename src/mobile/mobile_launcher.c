@@ -241,10 +241,10 @@ retrieve_file_in_pieces(char *path, CLIENT *clnt) {
 
 
 int
-establish_thin_client_connection(DBusGProxy *dbus_proxy) {
+establish_thin_client_connection(DBusGProxy *dbus_proxy, int iface) {
   int i, ret;
   guint gport = 0;
-  gint interface = -1;
+  gint interface = iface;
   GError *gerr = NULL;
 
 
@@ -292,6 +292,7 @@ main(int argc, char *argv[])
   gint interface = -1;
   int err, ret = EXIT_SUCCESS, opt, i;
   int vnc_port;
+  int usb_idx = -1;
   char port_str[NI_MAXSERV];
   struct addrinfo *info = NULL, hints;
   enum clnt_stat retval;
@@ -446,8 +447,11 @@ main(int argc, char *argv[])
 
   if(interface_strs != NULL) {
     fprintf(stderr, "(mobile-launcher) Found some interfaces:\n");
-    for(i=0; interface_strs[i] != NULL; i++)
+    for(i=0; interface_strs[i] != NULL; i++) {
       fprintf(stderr, "\t%d: %s\n", i, interface_strs[i]);
+      if(!strcmp(interface_strs[i], "usb0"))
+	usb_idx = i;
+    }
     fprintf(stderr, "\n");
   }
 
@@ -526,10 +530,17 @@ main(int argc, char *argv[])
 
   log_message("mobile launcher calculating latency");
 
+
+  /*
+   * If the round trip time of a null RPC is greater than 100 milliseconds,
+   * try using USB networking for the thin client connection; better latency
+   * is possible.
+   */
+
   ms = determine_rtt(clnt);
   if(ms > 100) {
     fprintf(stderr, "(mobile-launcher) Connection is slower than 100ms\n");
-    //use_USB = ask_user_for_USB();
+    interface = usb_idx;
   }
   else {
     fprintf(stderr, "(mobile-launcher) Connection is faster than 100ms\n");
@@ -644,7 +655,7 @@ main(int argc, char *argv[])
    */
 
   log_message("mobile launcher requesting into DCM for thin client connection");
-  vnc_port = establish_thin_client_connection(dbus_proxy);
+  vnc_port = establish_thin_client_connection(dbus_proxy, interface);
   if(vnc_port < 0) {
     fprintf(stderr, "(mobile-launcher) DCM couldn't discover thin client "
 	    "services!\n");
