@@ -1,0 +1,64 @@
+/*
+ * miniRPC method calls between two devices using the Kimberley system.
+ * The server is generally assumed to be a large display, and the client
+ * is assumed to be mobile device.
+ */
+
+
+/* bound various sizes */
+const CHUNK_SIZE = 104856;
+const VMNAME_LEN = 128;
+const PATH_LEN = 4096;
+const URI_LEN = 4096;
+
+typedef string filename<PATH_LEN>;
+typedef opaque data<CHUNK_SIZE>;
+typedef opaque cookie<16>;
+
+struct load_vm_in {
+    string vm_name<VMNAME_LEN>;
+    string uri<URI_LEN>;
+};
+
+struct load_vm_out {
+    int result;
+};
+
+struct send_x {
+    filename name;
+    hyper    offset;
+    data     data;
+};
+
+struct retrieve_x {
+    filename name;
+    hyper    offset;
+};
+
+typedef bool retrieve_state;
+typedef string state<>;
+
+serverprocs {
+    /* Calls to transfer the VM overlay. */
+    load_vm_from_URL(load_vm_in, void) = 1;
+    load_vm_from_path(load_vm_in, void) = 2;
+    load_vm_from_attachment(load_vm_in, void) = 3;
+
+    /* Calls to support sending/receiving large files through RPC. */
+    send_chunk(send_x, void) = 4;
+    retrieve_chunk(retrieve_x, data) = 6;
+
+    /* Calls to support USB networking. */
+    ping(void, void) = 8;
+    use_USB_cable(void, void) = 9;
+
+    /* Call to indicate filename of floppy disk persistent state. */
+    use_persistent_state(filename, void) = 10;
+
+    /* Call to indicate filename of decryption key. */
+    use_encryption_key(filename, void) = 11;
+
+    /* Call to indicate the end of user interaction. */
+    end_usage(retrieve_state, state) = 12;
+}
+

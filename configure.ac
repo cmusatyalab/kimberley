@@ -29,12 +29,18 @@ PKG_CHECK_MODULES(DBUS_GLIB, [dbus-glib-1])
 AC_SUBST(DBUS_GLIB_CFLAGS)
 AC_SUBST(DBUS_GLIB_LIBS)
 
+PKG_CHECK_MODULES(MINIRPC, [minirpc])
+MINIRPCGEN="`pkg-config --variable=MINIRPCGEN minirpc`"
+AC_SUBST(MINIRPC_CFLAGS)
+AC_SUBST(MINIRPC_LIBS)
+AC_SUBST(MINIRPCGEN)
+
 # libs
 AC_SEARCH_LIBS([pthread_create],
 	[pthread],, AC_MSG_FAILURE([cannot find pthread_create function]))
 
 # some options and includes
-AC_SUBST(AM_CPPFLAGS, ['-D_REENTRANT'])
+AC_SUBST(AM_CPPFLAGS, ['-D_REENTRANT -D_GNU_SOURCE'])
 AC_SUBST(AM_CFLAGS, ['-Wall -Wextra -Werror-implicit-function-declaration -Wstrict-prototypes -Wmissing-prototypes -Wmissing-declarations -Wnested-externs'])
 
 

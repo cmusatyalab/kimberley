@@ -1,10 +1,14 @@
 .deps
 *.o
 *~
-dcm_dbus_app_glue.h
+kcm_dbus_app_glue.h
 display_launcher
 mobile_launcher
-rpc_mobile_launcher.h
+rpc_mobile_launcher_client.h
+rpc_mobile_launcher_minirpc.c
+rpc_mobile_launcher_minirpc.h
+rpc_mobile_launcher_server.h
+rpc_mobile_launcher_xdr.h
 *.x
 *_svc.c
 *_clnt.c
