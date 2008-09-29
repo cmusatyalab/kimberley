@@ -42,4 +42,4 @@ rpc_%_clnt.c: rpc_%.x
 
 kcm_dbus_app_glue.h: kcm.xml
 	$(RM) $@
-	dbus-binding-tool --mode=glib-client --prefix=dcm $< > $@
+	dbus-binding-tool --mode=glib-client --prefix=kcm $< > $@

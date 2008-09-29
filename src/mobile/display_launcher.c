@@ -93,17 +93,16 @@ catch_sigint(int sig) {
 DBusGConnection *dbus_conn = NULL;
 
 int
-create_dcm_service(char *name, unsigned short port) {
+create_kcm_service(char *name, unsigned short port) {
     DBusGProxy *dbus_proxy = NULL;
     GError *gerr = NULL;
     int ret = 0, i;
-    gchar *gname;
     guint gport;
     gchar **interface_strs = NULL;
     gint interface = -1;
 
     if(name == NULL) {
-      fprintf(stderr, "(display-launcher) bad args to create_dcm_service\n");
+      fprintf(stderr, "(display-launcher) bad args to create_kcm_service\n");
       return -1;
     }
 
@@ -125,19 +124,19 @@ create_dcm_service(char *name, unsigned short port) {
     
     /* This won't trigger activation! */
     dbus_proxy = dbus_g_proxy_new_for_name(dbus_conn,
-					   DCM_DBUS_SERVICE_NAME,
-					   DCM_DBUS_SERVICE_PATH,
-					   DCM_DBUS_SERVICE_NAME);
+					   KCM_DBUS_SERVICE_NAME,
+					   KCM_DBUS_SERVICE_PATH,
+					   KCM_DBUS_SERVICE_NAME);
     
     fprintf(stderr, "(display-launcher) DBus proxy calling into "
 	    "KCM (name=%s, port=%u)..\n", name, port);
 
-    fprintf(stderr, "(example-server) dbus proxy making call (sense)..\n");
+    fprintf(stderr, "(display-launcher) dbus proxy making call (sense)..\n");
     
     /* The method call will trigger activation. */
     if(!edu_cmu_cs_kimberley_kcm_sense(dbus_proxy, &interface_strs, &gerr)) {
       /* Method failed, the GError is set, let's warn everyone */
-      g_warning("(example-server) kcm->sense() method failed: %s", 
+      g_warning("(display-launcher) kcm->sense() method failed: %s", 
 		gerr->message);
       g_error_free(gerr);
       ret = -1;
@@ -145,13 +144,13 @@ create_dcm_service(char *name, unsigned short port) {
     }
     
     if(interface_strs != NULL) {
-      fprintf(stderr, "(example-server) Found some interfaces:\n");
+      fprintf(stderr, "(display-launcher) Found some interfaces:\n");
       for(i=0; interface_strs[i] != NULL; i++)
 	fprintf(stderr, "\t%d: %s\n", i, interface_strs[i]);
       fprintf(stderr, "\n");
     }
     
-    fprintf(stderr, "(example-server) dbus proxy making call (publish)..\n");
+    fprintf(stderr, "(display-launcher) dbus proxy making call (publish)..\n");
     
     gport = port;
     
@@ -177,11 +176,10 @@ create_dcm_service(char *name, unsigned short port) {
     return ret;
 }
 
-
 int
 main(int argc, char *argv[])
 {
-  int                listenfd, dcm_connfd, rpc_connfd;
+  int                listenfd, kcm_connfd, rpc_connfd;
   struct sockaddr_in sa;
   int                err;
   unsigned short     port;
@@ -239,12 +237,12 @@ main(int argc, char *argv[])
 
   while(1) {
 
-    fprintf(stderr, "(display-launcher) registering with DCM..\n");
+    fprintf(stderr, "(display-launcher) registering with KCM..\n");
     
-    if(create_dcm_service(LAUNCHER_DCM_SERVICE_NAME, port) < 0) {
+    if(create_kcm_service(LAUNCHER_KCM_SERVICE_NAME, port) < 0) {
       struct timeval tv;
 
-      fprintf(stderr, "(display-launcher) failed sending message to DCM. "
+      fprintf(stderr, "(display-launcher) failed sending message to KCM. "
 	      "Sleeping one second and trying again..\n");
       
       tv.tv_sec = 1;
@@ -255,18 +253,18 @@ main(int argc, char *argv[])
       continue;
     }
     
-    fprintf(stderr, "(display-launcher) Accepting DCM connection..\n");
+    fprintf(stderr, "(display-launcher) Accepting KCM connection..\n");
     
   
-    dcm_connfd = accept(listenfd, NULL, NULL);
-    if(dcm_connfd < 0) {
+    kcm_connfd = accept(listenfd, NULL, NULL);
+    if(kcm_connfd < 0) {
       perror("accept");
       return -1;
     }
   
     fprintf(stderr, "(display-launcher) Tunneling..\n");
   
-    local_tunnel(dcm_connfd, rpc_connfd);
+    local_tunnel(kcm_connfd, rpc_connfd);
   
     fprintf(stderr, "(display-launcher) A connection was closed.\n");
 

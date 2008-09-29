@@ -46,7 +46,7 @@ perform_authentication(void) {
 
 /*
  * Perform a series of pings to determine the round-trip latency of
- * using the current connection through the DCM.  If this is below
+ * using the current connection through the KCM.  If this is below
  * some threshold, the system will prompt the user to optionally use
  * a USB cable for the thin client connection instead.
  */
@@ -248,7 +248,7 @@ establish_thin_client_connection(DBusGProxy *dbus_proxy, int iface) {
   GError *gerr = NULL;
 
 
-  fprintf(stderr, "(mobile-launcher) Calling into DCM to make "
+  fprintf(stderr, "(mobile-launcher) Calling into KCM to make "
 	  "thin client connection..\n");
 
   ret = -1;
@@ -256,7 +256,7 @@ establish_thin_client_connection(DBusGProxy *dbus_proxy, int iface) {
   for(i=0; i<AVAHI_TIMEOUT; i++) {
 
     if(!edu_cmu_cs_kimberley_kcm_browse(dbus_proxy, 
-					VNC_DCM_SERVICE_NAME, 
+					VNC_KCM_SERVICE_NAME, 
 					interface, 
 					&gport, 
 					&gerr)) {
@@ -265,7 +265,7 @@ establish_thin_client_connection(DBusGProxy *dbus_proxy, int iface) {
       tv.tv_sec = 1;
       tv.tv_usec = 0;
 
-      g_warning("(mobile-launcher) dcm->browse() method failed: %s", 
+      g_warning("(mobile-launcher) kcm->browse() method failed: %s", 
 		gerr->message);
       
       select(0, NULL, NULL, NULL, &tv);
@@ -406,8 +406,8 @@ main(int argc, char *argv[])
     goto cleanup;
   }
   
-  fprintf(stderr, "(mobile-launcher) creating DBus proxy to DCM (%s)..\n",
-	  DCM_DBUS_SERVICE_NAME);
+  fprintf(stderr, "(mobile-launcher) creating DBus proxy to KCM (%s)..\n",
+	  KCM_DBUS_SERVICE_NAME);
   
 
   /*
@@ -415,9 +415,9 @@ main(int argc, char *argv[])
    */
 
   dbus_proxy = dbus_g_proxy_new_for_name(dbus_conn, 
-					 DCM_DBUS_SERVICE_NAME, 
-					 DCM_DBUS_SERVICE_PATH, 
-					 DCM_DBUS_SERVICE_NAME);
+					 KCM_DBUS_SERVICE_NAME, 
+					 KCM_DBUS_SERVICE_PATH, 
+					 KCM_DBUS_SERVICE_NAME);
   if(dbus_proxy == NULL) {
     fprintf(stderr, "(mobile-launcher) failed creating DBus proxy!\n");
     ret = EXIT_FAILURE;
@@ -428,9 +428,9 @@ main(int argc, char *argv[])
 	
 
   /*
-   * Signal DCM that you would like it to search for an RPC service.
+   * Signal KCM that you would like it to search for an RPC service.
    * The method call will trigger activation.  In other words,
-   * if the DCM is not running before this call is made, it will be
+   * if the KCM is not running before this call is made, it will be
    * afterwards, assuming service files are installed correctly. 
    */
 
@@ -459,7 +459,7 @@ main(int argc, char *argv[])
   fprintf(stderr, "(mobile-launcher) DBus calling into kcm (browse)..\n");
 
   if(!edu_cmu_cs_kimberley_kcm_browse(dbus_proxy, 
-				      LAUNCHER_DCM_SERVICE_NAME, 
+				      LAUNCHER_KCM_SERVICE_NAME, 
 				      interface, 
 				      &gport, 
 				      &gerr)) {
@@ -496,7 +496,7 @@ main(int argc, char *argv[])
     goto cleanup;
   }
   
-  fprintf(stderr, "(mobile-launcher) connect()ing locally to dcm..\n");
+  fprintf(stderr, "(mobile-launcher) connect()ing locally to kcm..\n");
 	
   if(connect(connfd, info->ai_addr, sizeof(struct sockaddr_in)) < 0) {
     perror("connect");
@@ -651,22 +651,22 @@ main(int argc, char *argv[])
 
 
   /*
-   * Signal DCM that you would like it to search for a VNC service.
+   * Signal KCM that you would like it to search for a VNC service.
    */
 
-  log_message("mobile launcher requesting into DCM for thin client connection");
+  log_message("mobile launcher requesting into KCM for thin client connection");
   vnc_port = establish_thin_client_connection(dbus_proxy, interface);
   if(vnc_port < 0) {
-    fprintf(stderr, "(mobile-launcher) DCM couldn't discover thin client "
+    fprintf(stderr, "(mobile-launcher) KCM couldn't discover thin client "
 	    "services!\n");
     ret = EXIT_FAILURE;
     goto cleanup;
   }
   else {
-    fprintf(stderr, "(mobile-launcher) DCM client() returned port: %d\n", 
+    fprintf(stderr, "(mobile-launcher) KCM client() returned port: %d\n", 
 	    vnc_port);
   }
-  log_message("mobile launcher completed request into DCM for thin client connection");
+  log_message("mobile launcher completed request into KCM for thin client connection");
 
   snprintf(command, ARG_MAX, "vncviewer localhost::%u", vnc_port);
   fprintf(stderr, "(mobile-launcher) executing: %s\n", command);

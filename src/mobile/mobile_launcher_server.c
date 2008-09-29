@@ -150,9 +150,9 @@ handle_dekimberlize_thread_setup() {
   fprintf(stderr, "(display-launcher) Registering VNC port %u with Avahi\n",
 	  port);
 
-  if(create_dcm_service(VNC_DCM_SERVICE_NAME, port) < 0) {
+  if(create_kcm_service(VNC_KCM_SERVICE_NAME, port) < 0) {
     fprintf(stderr, "(display-launcher) failed creating "
-	    "VNC service in DCM..\n");
+	    "VNC service in KCM..\n");
     return -1;
   }
 

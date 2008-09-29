@@ -15,7 +15,7 @@ typedef struct {
 extern volatile kimberley_state_t current_state;
 
 int		make_tcpip_connection(char *hostname, unsigned short port);
-void		local_tunnel(int dcm_sock, int rpc_sock);
-int		create_dcm_service(char *name, unsigned short port);
+void		local_tunnel(int kcm_sock, int rpc_sock);
+int		create_kcm_service(char *name, unsigned short port);
 
 #endif
