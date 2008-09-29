@@ -1,4 +1,4 @@
-bin_PROGRAMS = display_launcher mobile_launcher gettimeofday
+bin_PROGRAMS = display_launcher mobile_launcher
 bin_SCRIPTS = display_setup
 
 CPPFLAGS = $(DBUS_GLIB_CFLAGS) ${MINIRPC_CFLAGS}
@@ -13,9 +13,6 @@ display_launcher_SOURCES = display_launcher.c display_launcher.h \
 
 mobile_launcher_SOURCES = mobile_launcher.c common.c common.h \
 	$(MINIRPC_FILES) kcm.xml
-
-
-gettimeofday_SOURCES = gettimeofday.c
 
 MINIRPC_GENERATED = \
 	${MINIRPC_FILES:.mx=_client.h}  ${MINIRPC_FILES:.mx=_server.h} \
