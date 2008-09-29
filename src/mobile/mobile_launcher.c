@@ -219,7 +219,7 @@ establish_thin_client_connection(DBusGProxy *dbus_proxy, int iface)
   for(i=0; i<AVAHI_TIMEOUT; i++) {
 
     if(!edu_cmu_cs_kimberley_kcm_browse(dbus_proxy,
-					VNC_DCM_SERVICE_NAME,
+					VNC_KCM_SERVICE_NAME,
 					interface,
 					&gport,
 					&gerr)) {
@@ -369,7 +369,7 @@ main(int argc, char *argv[])
     }
 
     fprintf(stderr, "(mobile-launcher) creating DBus proxy to KCM (%s)..\n",
-	    DCM_DBUS_SERVICE_NAME);
+	    KCM_DBUS_SERVICE_NAME);
 
 
     /*
@@ -377,9 +377,9 @@ main(int argc, char *argv[])
      */
 
     dbus_proxy = dbus_g_proxy_new_for_name(dbus_conn,
-					   DCM_DBUS_SERVICE_NAME,
-					   DCM_DBUS_SERVICE_PATH,
-					   DCM_DBUS_SERVICE_NAME);
+					   KCM_DBUS_SERVICE_NAME,
+					   KCM_DBUS_SERVICE_PATH,
+					   KCM_DBUS_SERVICE_NAME);
     if(dbus_proxy == NULL) {
 	fprintf(stderr, "(mobile-launcher) failed creating DBus proxy!\n");
 	ret = EXIT_FAILURE;
@@ -420,7 +420,7 @@ main(int argc, char *argv[])
 
     fprintf(stderr, "(mobile-launcher) DBus calling into kcm (browse)..\n");
 
-    if (!edu_cmu_cs_kimberley_kcm_browse(dbus_proxy, LAUNCHER_DCM_SERVICE_NAME,
+    if (!edu_cmu_cs_kimberley_kcm_browse(dbus_proxy, LAUNCHER_KCM_SERVICE_NAME,
 					 interface, &gport, &gerr))
     {
 	/* Method failed, the GError is set, let's warn everyone */

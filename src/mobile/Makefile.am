@@ -30,4 +30,4 @@ CLEANFILES = ${BUILT_SOURCES}
 
 kcm_dbus_app_glue.h: kcm.xml
 	$(RM) $@
-	dbus-binding-tool --mode=glib-client --prefix=dcm $< > $@
+	dbus-binding-tool --mode=glib-client --prefix=kcm $< > $@

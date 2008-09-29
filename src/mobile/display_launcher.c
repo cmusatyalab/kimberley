@@ -23,18 +23,17 @@ static struct mrpc_conn_set *mrpc_cset;
 static DBusGConnection *dbus_conn;
 
 int
-create_dcm_service(char *name, char *svc)
+create_kcm_service(char *name, char *svc)
 {
     DBusGProxy *dbus_proxy = NULL;
     GError *gerr = NULL;
     int ret = 0, i;
-    gchar *gname;
     guint gport;
     gchar **interface_strs = NULL;
     gint interface = -1;
 
     if(name == NULL) {
-      fprintf(stderr, "(display-launcher) bad args to create_dcm_service\n");
+      fprintf(stderr, "(display-launcher) bad args to create_kcm_service\n");
       return -1;
     }
 
@@ -56,9 +55,9 @@ create_dcm_service(char *name, char *svc)
 
     /* This won't trigger activation! */
     dbus_proxy = dbus_g_proxy_new_for_name(dbus_conn,
-					   DCM_DBUS_SERVICE_NAME,
-					   DCM_DBUS_SERVICE_PATH,
-					   DCM_DBUS_SERVICE_NAME);
+					   KCM_DBUS_SERVICE_NAME,
+					   KCM_DBUS_SERVICE_PATH,
+					   KCM_DBUS_SERVICE_NAME);
 
     fprintf(stderr, "(display-launcher) DBus proxy calling into "
 	    "KCM (name=%s, port=%s)..\n", name, svc);
@@ -113,7 +112,7 @@ static void *new_conn(void *set_data, struct mrpc_connection *conn,
 {
     kimberley_state_t *state;
 
-    fprintf(stderr, "(display-launcher) Accepting DCM connection..\n");
+    fprintf(stderr, "(display-launcher) Accepting KCM connection..\n");
 
     state = calloc(1, sizeof(kimberley_state_t));
 
@@ -217,11 +216,11 @@ int main(int argc, char *argv[])
     while(1) {
 	struct timeval tv = { .tv_sec = 10 };
 
-	fprintf(stderr, "(display-launcher) registering with DCM..\n");
+	fprintf(stderr, "(display-launcher) registering with KCM..\n");
 
-	if (create_dcm_service(LAUNCHER_DCM_SERVICE_NAME, svc) < 0)
+	if (create_kcm_service(LAUNCHER_KCM_SERVICE_NAME, svc) < 0)
 	{
-	    fprintf(stderr, "(display-launcher) failed sending message to DCM. "
+	    fprintf(stderr, "(display-launcher) failed sending message to KCM. "
 		    "Sleeping one second and trying again..\n");
 
 	    tv.tv_sec = 1;

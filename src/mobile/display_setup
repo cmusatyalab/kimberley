@@ -6,9 +6,9 @@
 # on the display
 #
 
-x_res=`xdpyinfo | grep dimensions | head -1 | sed -e 's/ //g' | cut -f2 -d':' | cut -f1 -d'x'`
-y_res=`echo $x_res*3/5 | bc`
-resolution=`echo ${x_res}x${y_res}`
+x_res=$(xdpyinfo | awk '/dimensions: {print $2}' | head -1 | cut -dx -f1)
+y_res=$(expr $x_res \* 3 / 5)
+resolution="${x_res}x${y_res}"
 
 
 ########################################################################
@@ -35,4 +35,3 @@ DISPLAY=:0.0 dekimberlize $@
 #
 
 killall x11vnc
-rm -f /tmp/x11vnc_port

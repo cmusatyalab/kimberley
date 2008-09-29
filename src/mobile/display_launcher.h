@@ -11,6 +11,6 @@ typedef struct {
 
 extern const struct rpc_mobile_launcher_server_operations *server_ops;
 
-int create_dcm_service(char *name, char *port);
+int create_kcm_service(char *name, char *port);
 
 #endif
