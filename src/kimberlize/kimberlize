@@ -13,68 +13,65 @@
 # Functions to simplify code.
 #
 
+#
+## Executes commands in the virtual machine by sending them over a unix domain socket
+#
+RUN()
+{
+	cat > /tmp/kimberlize.py << EOF
+import sys,socket
+s = socket.socket(socket.AF_UNIX)
+s.connect("/tmp/kimberley-COM1")
+for cmd in sys.stdin:
+  if cmd[0] == '#': continue
+  print "Running:", cmd[:-1]
+  s.send(cmd)
+  out = ''
+  while 1:
+    out = out + s.recv(1024)
+    if out[-4:] == '\r\n# ': break
+    if out[-4:] == '\r\n$ ': break
+  print out
+s.close()
+EOF
+	python /tmp/kimberlize.py
+}
+
 
 #
 ## Print the command's syntax.
 #
-
 usage()
 {
-    echo "usage: kimberlize [-e [-k encryption-key-file]] [-l login-name] [-p port] [-n]"
+    echo "usage: kimberlize [-e [-k encryption-key-file]] [-n]"
     echo "                    <vm-name> <app-name> <install-script> <execute-script>"
 }
 
 
 #
-## Check whether a virtual machine is running.
-##   $1: The vm's name or UUID
-##   $?: 1 if running, 0 if not
-#
-
-vm_running()
-{
-    uuid=`VBoxManage showvminfo $1 | grep UUID | head -1 | sed -e 's/ //g' | cut -f2 -d':'`
-    running=`VBoxManage list runningvms | grep $uuid`
-
-    if [ "$uuid" = "$running" ]; then
-        return 1
-    fi
-
-    return 0
-}
-
-
-#
 ## Poll VirtualBox about a VM until it is running.
-##   $1: The vm's name or UUID
-##   $2: The number of seconds until timeout
+##   $1: The vm's state
+##   $2: The vm's name or UUID
+##   $3: The number of seconds until timeout
 ##   $?: 1 if running, 0 if not
 #
-
-sleep_until_vm_running()
+sleep_until_vm()
 {
-    for ((i=0;i<$2;i+=1)); do
-        vm_running $1
-        vm_status=$?
-
-        if [ $vm_status -eq 1 ]; then
-            return 1
-        fi
-        sleep 1s
+    for ((i=0;i<$3;i+=1)); do
+	state=$(VBoxManage showvminfo "$2" -machinereadable | \
+			sed -ne 's/^VMState="\(.*\)"/\1/p')
+	[ "$state" = "$1" ] && return 1
+        sleep 0.1s
     done
-
     return 0
 }
 
 
-if [ $# -lt 3 ]; then
+if [ $# -lt 2 ]; then
 	usage
 	exit 1
 fi
 
-snapshot_name="base"
-login_name="kimberley"
-login_port=2222
 compression=1
 install_script=""
 execute_script=""
@@ -94,17 +91,9 @@ do
 			echo "Using encryption passphrase from file '$OPTARG'"
 			encryption_keyfile=$OPTARG
 			;;
-		l) 	
-			echo "Using login name '$OPTARG'.."
-			login_name=$OPTARG
-			;;
 		n) 	
 			echo "Disabling compression.."
 			compression=0
-			;;
-		p) 	
-			echo "Using port '$OPTARG'.."
-			login_port=$OPTARG
 			;;
 		h)
 			usage
@@ -118,10 +107,10 @@ do
 done
 shift $(($OPTIND-1))
 
-vm_name=$1
+vm_name="$1"
 app_name=$2
-install_script=$3
-execute_script=$4
+install_script=${3:-${app_name}-install}
+execute_script=${4:-${app_name}-execute}
 log_filename=$2.log
 
 
@@ -151,15 +140,10 @@ echo "Installing application in VM '$vm_name'.."
 
 
 ########################################################################
-# Port forward local port to VM (TCP host:2222->guest:22)
+# Enable serial port and RDP over loopback
 #
-
-echo 
-echo "Port forwarding (host:$login_port -> guest:22) for SSH.."
-VBoxManage setextradata $vm_name "VBoxInternal/Devices/pcnet/0/LUN#0/Config/diamond_ssh/HostPort" $login_port > /dev/null
-VBoxManage setextradata $vm_name "VBoxInternal/Devices/pcnet/0/LUN#0/Config/diamond_ssh/GuestPort" 22 > /dev/null
-VBoxManage setextradata $vm_name "VBoxInternal/Devices/pcnet/0/LUN#0/Config/diamond_ssh/Protocol" TCP > /dev/null
-
+#VBoxManage modifyvm "$vm_name" -uartmode1 server /tmp/kimberley-COM1
+#VBoxManage modifyvm "$vm_name" -vrdp on -vrdpaddress 127.0.0.1
 
 ########################################################################
 # Create a preliminary snapshot of the virtual machine while it is suspended.
@@ -170,7 +154,7 @@ VBoxManage setextradata $vm_name "VBoxInternal/Devices/pcnet/0/LUN#0/Config/diam
 START=$(date +%s)
 echo
 echo "Snapshotting VM '$vm_name'.."
-VBoxManage snapshot $vm_name take $snapshot_name > /dev/null
+VBoxManage snapshot "$vm_name" take kimberlize_base > /dev/null
 if [ $? -ne 0 ]; then
 	echo `basename $0`: error: failed taking VM snapshot
     exit 1
@@ -183,7 +167,7 @@ fi
 
 echo
 echo "Resuming VM '$vm_name'.."
-VBoxManage startvm $vm_name > /dev/null
+VBoxManage startvm "$vm_name" > /dev/null
 #-type vrdp
 if [ $? -ne 0 ]; then
 	echo `basename $0`: error: failed resuming VM
@@ -192,11 +176,7 @@ fi
 
 echo
 echo "Resuming.."
-sleep_until_vm_running $vm_name 300
-
-echo
-echo "Sleeping 15 secs while the VM gets a network address.."
-sleep 15s
+sleep_until_vm running "$vm_name" 300
 
 END=$(date +%s)
 DIFF=$(( $END - $START ))
@@ -210,38 +190,19 @@ echo "Snapshot, VM launch: $DIFF" >> ${log_filename}
 START=$(date +%s)
 echo
 echo "Executing install script '$install_script' inside VM.."
-install_basename=`basename $install_script`
-scp -P $login_port $install_script $login_name@localhost:/tmp
-ssh -t -l $login_name -p $login_port localhost /tmp/$install_basename
+( echo 'wget -O- http://128.2.216.108 >/dev/null' # wait for network
+  cat "$install_script" ) | RUN
 
 echo
 echo "Executing application script '$execute_script' inside VM.."
-execute_basename=`basename $execute_script`
-scp -P $login_port $execute_script $login_name@localhost:/tmp
-ssh -f -l $login_name -p $login_port localhost /tmp/$execute_basename
-sleep 7s
-#ssh -f -l $login_name -p $login_port localhost 'sync'
+( echo 'su -l -s /bin/sh kimberley'
+  echo 'export DISPLAY=:0'
+  cat "$execute_script" ) | RUN
+sleep 2
+
 END=$(date +%s)
 DIFF=$(( $END - $START ))
 echo "Application install and exec: $DIFF" >> ${log_filename}
-
-########################################################################
-# XXX EXPERIMENTAL
-# Execute zerofree, which cleans freed blocks, increasing compressibility.
-# This is turned off for now due to the fact that zerofree needs to
-# change runlevels, which may trash memory state.
-
-zf=`printenv ZEROFREE`;
-if [ "$zf" != "" ]; then
-	echo
-	echo "Zerofree-ing the guest VM to decrease its size.."
-	scp $zf $login_name@localhost:~/ :-P $login_port
-	scp zerofree_script $login_name@localhost:~/ :-P $login_port
-	sudo telinit 1
-	ssh -f -l $login_name -p $login_port localhost ~/$zf
-	sudo telinit 5
-fi
-
 
 ########################################################################
 # Tear down the VM, writing the in-memory state to disk (.sav)
@@ -249,7 +210,7 @@ fi
 
 echo
 echo "Suspending VM $vm_name (saving state).."
-VBoxManage controlvm $vm_name savestate > /dev/null
+VBoxManage controlvm "$vm_name" savestate > /dev/null
 if [ $? -ne 0 ]; then
     echo `basename $0`: error: failed suspending VM state
     exit 1
@@ -259,17 +220,18 @@ fi
 ########################################################################
 # Parse the various UUIDs used in filename construction.
 #
+vmpath="$HOME/.VirtualBox/Machines/$vm_name"
+base_snapshot_uuid=$(VBoxManage showvminfo "$vm_name" -machinereadable |
+	sed -ne 's/^SnapshotUUID="\(.*\)"$/\1/p')
+base_mem_state="$vmpath/Snapshots/{$base_snapshot_uuid}.sav"
 
-homedir=`printenv HOME`
+curr_snapshot_uuid=$(VBoxManage showvminfo "$vm_name" -machinereadable |
+	sed -ne 's/^UUID="\(.*\)"$/\1/p')
+curr_mem_state="$vmpath/Snapshots/{$curr_snapshot_uuid}.sav"
 
-mem_snapshot_uuid=`cat $homedir/.VirtualBox/Machines/$vm_name/$vm_name.xml | grep currentSnapshot | cut -f4 -d'"' | sed -e 's/{//g' | sed -e 's/}//g'`
-mem_snapshot_file="$HOME/.VirtualBox/Machines/$vm_name/Snapshots/{${mem_snapshot_uuid}}.sav"
-
-mem_current_uuid=`cat $homedir/.VirtualBox/Machines/$vm_name/$vm_name.xml | grep stateFile | head -1 | cut -f12 -d'"' | cut -f2 -d'{' | cut -f1 -d'}'` 
-mem_current_file="$HOME/.VirtualBox/Machines/$vm_name/Snapshots/{${mem_current_uuid}}.sav"
-
-disk_current_uuid=`cat $homedir/.VirtualBox/Machines/$vm_name/$vm_name.xml | grep hardDisk | tail -1 | cut -f6 -d'"' | sed -e 's/{//g' | sed -e 's/}//g'`
-disk_current_file="$HOME/.VirtualBox/Machines/$vm_name/Snapshots/{${disk_current_uuid}}.vdi"
+disk_snapshot_uuid=$(cat "$vmpath/$vm_name.xml" | 
+	sed -ne 's/.*<HardDiskAttachment hardDisk="{\(.*\)}" .*/\1/p' | tail -1)
+disk_snapshot_file="$vmpath/Snapshots/{$disk_snapshot_uuid}.vdi"
 
 
 ########################################################################
@@ -279,29 +241,27 @@ disk_current_file="$HOME/.VirtualBox/Machines/$vm_name/Snapshots/{${disk_current
 #
 
 START=$(date +%s)
-rm -rf /tmp/$vm_name/
-mkdir -p /tmp/$vm_name/Snapshots/
+rm -rf "/tmp/$vm_name"
+mkdir -p "/tmp/$vm_name"
+
+diff_mem_state="/tmp/$vm_name/${curr_snapshot_uuid}.diff"
 
 echo
 echo "Taking the delta between current in-memory state and the checkpoint's.."
-xdelta delta -0 $mem_snapshot_file $mem_current_file /tmp/$vm_name/Snapshots/${mem_snapshot_uuid}.diff
-
+xdelta delta -0 "$base_mem_state" "$curr_mem_state" "$diff_mem_state"
 
 echo
 echo "Taking the delta between current disk image and the checkpoint's.."
-scp $disk_current_file /tmp/$vm_name/Snapshots/
-#scp $HOME/.VirtualBox/Machines/$vm_name/Snapshots/*.vdi /tmp/$vm_name/Snapshots/
-scp $HOME/.VirtualBox/Machines/$vm_name/$vm_name.xml /tmp/$vm_name/$vm_name.xml
-scp $HOME/.VirtualBox/VirtualBox.xml /tmp/$vm_name/VirtualBox.xml
+cp "$disk_snapshot_file" "/tmp/$vm_name/overlay.vdi"
 
-tar cf /tmp/${vm_name}-${app_name}.tar -C /tmp $vm_name
 overlay_filename="/tmp/${vm_name}-${app_name}.tar"
+tar cf "$overlay_filename" -C /tmp "$vm_name"
 
-echo "Mem  diff (.diff) size: `ls -l  /tmp/$vm_name/Snapshots/${mem_snapshot_uuid}.diff | awk '{print $5}'` " >> ${log_filename}
-echo "Disk diff (.vdi)  size: `ls -l  $disk_current_file | awk '{print $5}'` " >> ${log_filename}
+echo "Mem  diff (.diff) size: "$(wc -c "$diff_mem_state") >> ${log_filename}
+echo "Disk diff (.vdi)  size: "$(wc -c "$disk_snapshot_file") >> ${log_filename}
 
-ls -lR /tmp/$vm_name
-rm -rf /tmp/$vm_name
+ls -lR "/tmp/$vm_name"
+rm -rf "/tmp/$vm_name"
 
 
 ########################################################################
@@ -310,35 +270,31 @@ rm -rf /tmp/$vm_name
 #
 
 echo
-echo "Discarding new state of VM '$vm_name' and reverting to the checkpoint.."
-VBoxManage snapshot $vm_name discardcurrent -all > /dev/null
+echo "Discarding modified state of VM '$vm_name' and reverting to the checkpoint.."
+VBoxManage snapshot "$vm_name" discardcurrent -all >/dev/null
 if [ $? -ne 0 ]; then
-    echo `basename $0`: error: failed discarding VM snapshot '$snapshot_name' 
+    echo `basename $0`: error: failed discarding VM snapshot
 fi
-
-VBoxManage setextradata $vm_name "VBoxInternal/Devices/pcnet/0/LUN#0/Config/diamond_ssh/HostPort" > /dev/null
-VBoxManage setextradata $vm_name "VBoxInternal/Devices/pcnet/0/LUN#0/Config/diamond_ssh/GuestPort" > /dev/null
-VBoxManage setextradata $vm_name "VBoxInternal/Devices/pcnet/0/LUN#0/Config/diamond_ssh/Protocol" > /dev/null
 
 echo
 echo "VM returned to base state."
 
 END=$(date +%s)
 DIFF=$(( $END - $START ))
-echo "Uncompressed tarball creation: $DIFF" >> ${log_filename}
-echo "Uncompressed tarball size: `ls -l ${overlay_filename} | awk '{print $5}'`" >> ${log_filename}
+echo Uncompressed tarball creation: $DIFF >> ${log_filename}
+echo Uncompressed tarball size: $(wc -c "$overlay_filename") >> ${log_filename}
 
 if [ $compression -eq 1 ]; then
     echo
     START=$(date +%s)
     echo "Compressing VM overlay (LZMA).."
-    lzcat -z $overlay_filename > ${overlay_filename}.lzma
-    rm $overlay_filename
-    overlay_filename=${overlay_filename}.lzma
+    lzma -c "$overlay_filename" > "${overlay_filename}.lzma"
+    rm "$overlay_filename"
+    overlay_filename="${overlay_filename}.lzma"
     END=$(date +%s)
     DIFF=$(( $END - $START ))
-    echo "Compression: $DIFF" >> ${log_filename}
-    echo "Compressed tarball size: `ls -l ${overlay_filename} | awk '{print $5}'`" >> ${log_filename}
+    echo Compressed   tarball size: $(wc -c "$overlay_filename") >> ${log_filename}
+    echo Compression: $DIFF >> ${log_filename}
 else
     echo
     echo "Compression disabled, ignoring.."
@@ -353,12 +309,12 @@ if [ $encryption -ne 0 ]; then
 	echo "  - Using passphrase from first line of supplied file '$encryption_keyfile'.."
     else
 	encryption_keyfile="${overlay_filename}.key"
-	od -X -A n -N 16 --width=32 /dev/urandom > $encryption_keyfile
+	od -A n -N 16 -t x8 /dev/urandom > "$encryption_keyfile"
 	echo " - Generated encryption key in file '$encryption_keyfile'.."
     fi
-    openssl enc -aes-128-cbc -e -pass file:$encryption_keyfile -in $overlay_filename -out ${overlay_filename}.enc
-    rm $overlay_filename
-    overlay_filename=${overlay_filename}.enc
+    openssl enc -aes-128-cbc -e -pass "file:$encryption_keyfile" -in "$overlay_filename" -out "${overlay_filename}.enc"
+    rm "$overlay_filename"
+    overlay_filename="${overlay_filename}.enc"
     END=$(date +%s)
     DIFF=$(( $END - $START ))
     echo "Encryption: $DIFF" >> ${log_filename}

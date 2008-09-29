@@ -1,2 +1,2 @@
 #!/bin/bash
-sudo yum -y install gnumeric
+apt-get install -y gnumeric xtoolwait

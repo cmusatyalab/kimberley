@@ -1,0 +1,3 @@
+apt-get install -y abiword gimp gnumeric kpresenter xtoolwait
+# Need to get 37.0MB of archives
+# After this operation, 142MB of additional disk space will be used

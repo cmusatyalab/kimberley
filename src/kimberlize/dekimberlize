@@ -37,84 +37,39 @@ failure()
 
 
 #
-## Check whether a virtual machine is running.  
-##   $1: The vm's name or UUID
+## Poll VirtualBox about a VM until it is has changed to the state we want.
+##   $1: The vm's state
+##   $2: The vm's name or UUID
+##   $3: The number of seconds until timeout
 ##   $?: 1 if running, 0 if not
 #
-
-vm_running()
+sleep_until_vm()
 {
-    uuid=`VBoxManage showvminfo $1 | grep UUID | head -1 | sed -e 's/ //g' | cut -f2 -d':'`
-    running=`VBoxManage list runningvms | grep $uuid`
-
-    if [ "$uuid" = "$running" ]; then
-        return 1
-    fi
-
-    return 0
-}
-
-
-#
-## Poll VirtualBox about a VM until it is running.
-##   $1: The vm's name or UUID
-##   $2: The number of seconds until timeout
-##   $?: 1 if running, 0 if not
-#
-
-sleep_until_vm_running()
-{
-    for ((i=0;i<$2;i+=1)); do
-        vm_running $1
-        vm_status=$?
-
-        if [ $vm_status -eq 1 ]; then
-            return 1
-        fi
-        sleep 0.001s
+    for ((i=0;i<$3;i+=1)); do
+	state=$(VBoxManage showvminfo "$2" -machinereadable | \
+			sed -ne 's/^VMState="\(.*\)"/\1/p')
+	[ "$state" = "$1" ] && return 1
+        sleep 0.1s
     done
-
     return 0
 }
 
 
-#
-## Poll VirtualBox about a VM until it is stopped.
-##   $1: The vm's name or UUID
-##   $2: The number of seconds until timeout
-##   $?: 1 if stopped, 0 if not
-#
-
-sleep_until_vm_stopped()
+gettimeofday()
 {
-    for ((i=0;i<$2;i+=1)); do
-        vm_running $1
-        vm_status=$?
-
-        if [ $vm_status -eq 0 ]; then
-            return 1
-        fi
-        sleep 0.001s
-    done
-
-    return 0
+    echo $(date +"%F %T.%N") $*
 }
-
 
 ########################################################################
 # Beginning of actual dekimberlize script execution
 #
 
-gettimeofday "dekimberlize loaded" > /tmp/dekimberlize.log
-    
 if [ $# -lt 3 ]; then
 	usage
 	exit 1
 fi
 
-
-homedir=`printenv HOME`
-
+gettimeofday "dekimberlize loaded" > /tmp/dekimberlize.log
 
 #
 ## Default variables for managing floppy disk attachment
@@ -139,7 +94,7 @@ do
 
       a)
 
-        floppy_original=$OPTARG
+        floppy_original="$OPTARG"
         floppy_copy="${OPTARG}.new"
         floppy_diff="${OPTARG}.diff"
 
@@ -150,7 +105,7 @@ do
     
       d)
 
-        decryption_keyfile=$OPTARG
+        decryption_keyfile="$OPTARG"
         echo
         echo "PARAM: decryption key in file '$decryption_keyfile'.."
         ;;
@@ -164,7 +119,7 @@ do
             exit 1
         fi
         
-        overlay_file=$OPTARG
+        overlay_file="$OPTARG"
         echo
         echo "PARAM: VM overlay file '$overlay_file'.."
         ;;
@@ -178,27 +133,22 @@ do
             exit 1
         fi
         
-        overlay_file=`basename $OPTARG`
+        overlay_file=/tmp/$(basename "$OPTARG")
         echo
         echo "PARAM: VM overlay URL '$overlay_file'.."
 	gettimeofday "dekimberlize fetching VM overlay from URL" >> /tmp/dekimberlize.log
-        wget -O /tmp/$overlay_file $OPTARG
+        wget -O "$overlay_file" $OPTARG
 	gettimeofday "dekimberlize completed fetching VM overlay from URL" >> /tmp/dekimberlize.log
-        overlay_file=/tmp/$overlay_file
         ;;
-
 
       h)
         usage
         exit 0
         ;;
-
-	    
       ?)
         usage
-        exit 1
+        exit 0
         ;;
-
     esac
 done
 shift $(($OPTIND-1))
@@ -213,21 +163,23 @@ gettimeofday "dekimberlize finished parsing options" >> /tmp/dekimberlize.log
 #
 
 echo
+vmname="$1"
+vmpath="$HOME/.VirtualBox/Machines/$vmname"
 
-if [ -d $homedir/.VirtualBox/Machines/$1/ ]; then
-	echo "Found:  $homedir/.VirtualBox/Machines/$1/"
+if [ -d "$vmpath" ]; then
+	echo "Found:  $vmpath"
 else
 	echo "!! Could not find:"
-	echo "       $homedir/.VirtualBox/Machines/$1/"
+	echo "       $vmpath"
 	echo "   Please check the name of your virtual machine."
 	exit 1
 fi
 
-if [ -e $homedir/.VirtualBox/Machines/$1/$1.xml ]; then
-	echo "Found:  $homedir/.VirtualBox/Machines/$1/$1.xml"
+if [ -e "$vmpath/$vmname.xml" ]; then
+	echo "Found:  $vmpath/$vmname.xml"
 else
 	echo "!! Could not find:"
-	echo "       $homedir/.VirtualBox/Machines/$1/$1.xml"
+	echo "       $vmpath/$vmname.xml"
 	echo "   Please check that your VM state is not corrupt."
 	exit 1
 fi
@@ -250,79 +202,69 @@ rm -f /tmp/dekimberlize.resumed
 # decrypting and decompressing first if necessary.
 #
 
-
-if [ "$decryption_keyfile" != "" ]; then
-
-    echo "Decrypting.."
-    output_file=`echo $overlay_file | sed 's/.enc//g'`
-
-    gettimeofday "dekimberlize decrypting VM overlay" >> /tmp/dekimberlize.log
-    openssl enc -aes-128-cbc -d -pass file:$decryption_keyfile -in $overlay_file -out $output_file
-    gettimeofday "dekimberlize completed decrypting VM overlay" >> /tmp/dekimberlize.log
-
-    rm $overlay_file
-    overlay_file=$output_file
-    echo " - Created decrypted VM overlay file: $overlay_file"
-fi
-
-
-echo
-echo "Checking for compression.."
-compressed=`echo $overlay_file | grep lzma`
-if [ "$compressed" != "" ]; then
-    echo "Decompressing.."
-    target_file=`echo $overlay_file | sed 's/.lzma//g'`
-    gettimeofday "dekimberlize uncompressing VM overlay" >> /tmp/dekimberlize.log
-    lzcat -d $overlay_file > $target_file
-    gettimeofday "dekimberlize completed uncompressing VM overlay" >> /tmp/dekimberlize.log
-    rm $overlay_file
-    overlay_file=$target_file
-    echo " - Created decompressed VM overlay file: $overlay_file"
-fi
-
-
 #
-## Untar into VM's directory;  this will overwrite the .xml metadata file,
-## add the Snapshots/*.vdi binary difference files to the disk state, and
-## also add a .diff file repesenting the binary difference in memory state,
-## which must be applied with xdelta.  Also, save the names of files
-## we create.
+## Create a base snapshot in the VM
 #
+echo
+echo "Creating base snapshot.."
+
+gettimeofday "dekimberlize creating base VM snapshot" >> /tmp/dekimberlize.log
+VBoxManage snapshot "$vmname" take kimberley_base > /dev/null
+gettimeofday "dekimberlize created base VM snapshot" >> /tmp/dekimberlize.log
+
+base_snapshot_uuid=$(VBoxManage showvminfo "$vmname" -machinereadable |
+	sed -ne 's/^SnapshotUUID="\(.*\)"$/\1/p')
+base_mem_state="$vmpath/Snapshots/{$base_snapshot_uuid}.sav"
+
+curr_snapshot_uuid=$(VBoxManage showvminfo "$vmname" -machinereadable |
+	sed -ne 's/^UUID="\(.*\)"$/\1/p')
+curr_mem_state="$vmpath/Snapshots/{$curr_snapshot_uuid}.sav"
+
+disk_snapshot_uuid=$(cat "$vmpath/$vmname.xml" | 
+	sed -ne 's/.*<HardDiskAttachment hardDisk="{\(.*\)}" .*/\1/p' | tail -1)
+disk_snapshot_file="$vmpath/Snapshots/{$disk_snapshot_uuid}.vdi"
+
+decrypt()
+{
+    if [ "$decryption_keyfile" != "" ]; then
+	openssl enc -aes-128-cbc -d -pass "file:$decryption_keyfile"
+    else
+	cat
+    fi
+}
+
+decompress()
+{
+    compressed=$(echo "$overlay_file" | grep lzma)
+    if [ "$compressed" != "" ]; then
+	lzma -dc
+    else
+	cat
+    fi
+}
 
 echo
-echo "Untarring.."
-gettimeofday "dekimberlize untarring/patching VM overlay" >> /tmp/dekimberlize.log
-tar xf $overlay_file -C $homedir/.VirtualBox/Machines/
+echo "Unpacking VM overlay.."
+gettimeofday "dekimberlize unpacking VM overlay" >> /tmp/dekimberlize.log
 
-mem_snapshot_uuid=`tar tf $overlay_file | grep .diff | cut -f3 -d'/' | cut -f1 -d'.'`
-mem_current_uuid=`cat $homedir/.VirtualBox/Machines/$1/$1.xml | grep stateFile | head -1 | cut -f12 -d'"' | cut -f2 -d'{' | cut -f1 -d'}'`
-mem_current_file=$homedir/.VirtualBox/Machines/$1/Snapshots/{$mem_current_uuid}.sav
-mem_snapshot_diff=$homedir/.VirtualBox/Machines/$1/Snapshots/${mem_snapshot_uuid}.diff
-mem_snapshot_file=$homedir/.VirtualBox/Machines/$1/Snapshots/{$mem_snapshot_uuid}.sav
-echo "Moving current memory state:"
-echo "      $mem_current_file "
-echo "  to snapshot:"
-echo "      $mem_snapshot_file"
-mv $mem_current_file $mem_snapshot_file
+mkdir -p /tmp/dekimberlize
+cat "$overlay_file" | decrypt | decompress | tar -xf - -C /tmp/dekimberlize
 
-mv $homedir/.VirtualBox/Machines/$1/VirtualBox.xml $homedir/.VirtualBox/
+gettimeofday "dekimberlize completed unpacking VM overlay" >> /tmp/dekimberlize.log
 
-gettimeofday "dekimberlize completed untarring VM overlay" >> /tmp/dekimberlize.log
+overlay_mem_state="/tmp/dekimberlize/$vmname/${curr_snapshot_uuid}.diff"
+overlay_disk_file="/tmp/dekimberlize/$vmname/overlay.vdi"
+
+gettimeofday "dekimberlize patching VM overlay" >> /tmp/dekimberlize.log
 
 echo
-echo "Applying delta ($mem_snapshot_diff) of memory state.."
-xdelta patch $mem_snapshot_diff $mem_snapshot_file $mem_current_file
-chmod 600 $mem_current_file
-rm $mem_snapshot_diff
+echo "Applying VM overlay"
+xdelta patch "$overlay_mem_state" "$base_mem_state" "$curr_mem_state"
+cp "$overlay_disk_file" "$disk_snapshot_file"
+
 gettimeofday "dekimberlize completed patching VM overlay" >> /tmp/dekimberlize.log
 
-
-echo
-echo "Port forwarding (host:2222 -> guest:22).."
-VBoxManage setextradata $1 "VBoxInternal/Devices/pcnet/0/LUN#0/Config/diamond_ssh/HostPort" 2222 > /dev/null
-VBoxManage setextradata $1 "VBoxInternal/Devices/pcnet/0/LUN#0/Config/diamond_ssh/GuestPort" 22 > /dev/null
-VBoxManage setextradata $1 "VBoxInternal/Devices/pcnet/0/LUN#0/Config/diamond_ssh/Protocol" TCP > /dev/null
-
+rm -rf /tmp/dekimberlize
 
 ########################################################################
 # Launch VM using VirtualBox now that the application of the VM
@@ -330,16 +272,16 @@ VBoxManage setextradata $1 "VBoxInternal/Devices/pcnet/0/LUN#0/Config/diamond_ss
 #
 
 echo
-echo "Resuming VM '$1'.."
+echo "Resuming VM '$vmname'.."
 gettimeofday "dekimberlize resuming VM" >> /tmp/dekimberlize.log
-VBoxManage startvm $1 > /dev/null
+VBoxManage startvm "$vmname" > /dev/null
 if [ $? -ne 0 ]; then
     echo `basename $0`: error: failed resuming VM
     failure 
 fi
 
 
-sleep_until_vm_running $1 300
+sleep_until_vm running "$vmname" 300
 if [ $? -ne 1 ]; then
     echo "VM did not load! Stopping Dekimberlize process.."
     failure
@@ -355,11 +297,11 @@ gettimeofday "dekimberlize completed resuming VM" >> /tmp/dekimberlize.log
 ## the user has provided one.
 #
 
-if [ $floppy_original != "" ]; then
+if [ "$floppy_original" != "" ]; then
 
     echo
     echo "Copying original '$floppy_original' to mutable '$floppy_copy'.."
-    cp $floppy_original $floppy_copy
+    cp "$floppy_original" "$floppy_copy"
 
 
     echo
@@ -368,7 +310,7 @@ if [ $floppy_original != "" ]; then
     echo
     echo "Attaching floppy disk '$floppy_original' to VM.."
     gettimeofday "dekimberlize attaching floppy to VM" >> /tmp/dekimberlize.log
-    VBoxManage controlvm $1 floppyattach $floppy_copy
+    VBoxManage controlvm "$vmname" floppyattach "$floppy_copy"
     if [ $? -ne 0 ]; then
     	echo `basename $0`: error: failed attaching floppy disk 
     fi
@@ -399,9 +341,8 @@ echo "The user has ended the session."
 
 
 ########################################################################
-# Now clean up, tossing the dirty state and removing the port forwarding.
+# Now clean up, discard the dirty state
 #
-
 
 #
 ## Detach floppy disk image.  This must be done while the virtual
@@ -413,7 +354,7 @@ if [ "$floppy_original" != "" ]; then
     echo "Detaching floppy disk from VM.."
 
     gettimeofday "dekimberlize detaching floppy from VM" >> /tmp/dekimberlize.log
-    VBoxManage controlvm $1 floppyattach none
+    VBoxManage controlvm "$vmname" floppyattach none
     if [ $? -ne 0 ]; then
         echo `basename $0`: error: failed attaching floppy disk
     fi
@@ -426,9 +367,9 @@ fi
 #
 
 echo
-echo "Powering VM $1 down.."
+echo "Powering VM $vmname down.."
 gettimeofday "dekimberlize powering down VM" >> /tmp/dekimberlize.log
-VBoxManage controlvm $1 poweroff
+VBoxManage controlvm "$vmname" poweroff
 if [ $? -ne 0 ]; then
     echo `basename $0`: error: failed powering VM down
     failure
@@ -439,13 +380,14 @@ fi
 ## Wait for powerdown to complete.
 #
 
-sleep_until_vm_stopped $1 30
+sleep_until_vm poweroff "$vmname" 300
 if [ $? -ne 1 ]; then
     echo "VM did not stop! Stopping Dekimberlize process.."
     failure
 fi
 gettimeofday "dekimberlize completed powering down VM" >> /tmp/dekimberlize.log
 
+sleep 5
 
 #
 ## Unregister floppy disk image (registering is a side effect 
@@ -457,24 +399,23 @@ if [ "$floppy_original" != "" ]; then
     echo "Unregistering floppy disk with VirtualBox.."
 
     gettimeofday "dekimberlize unregistering floppy disk" >> /tmp/dekimberlize.log
-    VBoxManage unregisterimage floppy $floppy_copy
+    VBoxManage unregisterimage floppy "$floppy_copy"
     if [ $? -ne 0 ]; then
         echo `basename $0`: error: failed attaching floppy disk
     fi
-    gettimeofday "dekimberlize completed unregistering floppy disk" >> /tmp/dekimberlize.log
+    gettimeofday "dekimberlize completed unregistering floppy" >> /tmp/dekimberlize.log
+
+    #
+    ## Calculate the binary difference of the floppy image against a copy
+    ## of itself saved before attachment.
+    #
+
+    echo
+    echo "Calculating the floppy's binary difference in file '$floppy_diff'.."
+    gettimeofday "dekimberlize calculating floppy delta" >> /tmp/dekimberlize.log
+    xdelta delta "$floppy_original" "$floppy_copy" "$floppy_diff"
+    gettimeofday "dekimberlize completed calculating floppy delta" >> /tmp/dekimberlize.log
 fi
-
-
-#
-## Calculate the binary difference of the floppy image against a copy
-## of itself saved before attachment.
-#
-
-echo
-echo "Calculating the floppy's binary difference in file '$floppy_diff'.."
-gettimeofday "dekimberlize calculating floppy delta" >> /tmp/dekimberlize.log
-xdelta delta $floppy_original $floppy_copy $floppy_diff
-gettimeofday "dekimberlize completed calculating floppy delta" >> /tmp/dekimberlize.log
 
 
 #
@@ -485,17 +426,12 @@ gettimeofday "dekimberlize completed calculating floppy delta" >> /tmp/dekimberl
 echo
 echo "Discarding dirty state and restoring the original VM image.."
 gettimeofday "dekimberlize reverting to base VM" >> /tmp/dekimberlize.log
-VBoxManage snapshot $1 discardcurrent -all 
+VBoxManage snapshot "$vmname" discardcurrent -all 
 if [ $? -ne 0 ]; then
     echo `basename $0`: error: failed discarding VM state
     failure 
 fi
 gettimeofday "dekimberlize completed reverting to base VM" >> /tmp/dekimberlize.log
-
-VBoxManage setextradata $1 "VBoxInternal/Devices/pcnet/0/LUN#0/Config/diamond_ssh/HostPort" > /dev/null
-VBoxManage setextradata $1 "VBoxInternal/Devices/pcnet/0/LUN#0/Config/diamond_ssh/GuestPort" > /dev/null
-VBoxManage setextradata $1 "VBoxInternal/Devices/pcnet/0/LUN#0/Config/diamond_ssh/Protocol" > /dev/null
-
 
 rm -f /tmp/dekimberlize.lock
 

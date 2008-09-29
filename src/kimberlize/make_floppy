@@ -43,7 +43,7 @@ size=`echo "scale=1; 1024*$megabytes" | bc`
 echo
 echo "Creating floppy '$output_file' of size $megabytes MB.."
 echo
-mkdosfs -v -c -C $output_file $size
+/sbin/mkdosfs -v -c -C $output_file $size
 echo
 
 
