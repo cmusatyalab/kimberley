@@ -1,2 +1,2 @@
 #!/bin/bash
-DISPLAY=:0.0 nohup kpresenter &
+nohup xtoolwait kpresenter

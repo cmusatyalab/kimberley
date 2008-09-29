@@ -1,0 +1,2 @@
+#!/bin/bash
+nohup xtoolwait -mappings 2 abiword

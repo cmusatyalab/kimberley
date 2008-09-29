@@ -1,2 +1,2 @@
 #!/bin/bash
-sudo yum -y install gimp
+apt-get install xtoolwait gimp

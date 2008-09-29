@@ -1,2 +1,2 @@
 #!/bin/bash
-sudo yum -y install koffice-kpresenter
+apt-get install -y kpresenter xtoolwait

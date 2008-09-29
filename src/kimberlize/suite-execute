@@ -1,0 +1,4 @@
+nohup xtoolwait -mappings 2 abiword
+nohup xtoolwait -mappings 4 gimp
+nohup xtoolwait -mappings 1 gnumeric
+nohup xtoolwait -mappings 1 kpresenter
