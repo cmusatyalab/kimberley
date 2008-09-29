@@ -1,4 +1,4 @@
-bin_PROGRAMS = display_launcher mobile_launcher gettimeofday
+bin_PROGRAMS = display_launcher mobile_launcher
 bin_SCRIPTS = display_setup
 
 display_launcher_SOURCES = display_launcher.c display_launcher.h \
@@ -11,8 +11,6 @@ mobile_launcher_SOURCES = mobile_launcher.c \
 	rpc_mobile_launcher.x.in kcm.xml \
 	common.c common.h \
 	rpc_mobile_launcher_clnt.c rpc_mobile_launcher_xdr.c rpc_mobile_launcher.h
-
-gettimeofday_SOURCES = gettimeofday.c
 
 BUILT_SOURCES = \
 	rpc_mobile_launcher_clnt.c rpc_mobile_launcher_svc.c \
