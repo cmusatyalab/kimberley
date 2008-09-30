@@ -62,12 +62,12 @@ create_kcm_service(char *name, char *svc)
     fprintf(stderr, "(display-launcher) DBus proxy calling into "
 	    "KCM (name=%s, port=%s)..\n", name, svc);
 
-    fprintf(stderr, "(example-server) dbus proxy making call (sense)..\n");
+    fprintf(stderr, "(display-launcher) dbus proxy making call (sense)..\n");
 
     /* The method call will trigger activation. */
     if(!edu_cmu_cs_kimberley_kcm_sense(dbus_proxy, &interface_strs, &gerr)) {
       /* Method failed, the GError is set, let's warn everyone */
-      g_warning("(example-server) kcm->sense() method failed: %s",
+      g_warning("(display-launcher) kcm->sense() method failed: %s",
 		gerr->message);
       g_error_free(gerr);
       ret = -1;
@@ -75,13 +75,13 @@ create_kcm_service(char *name, char *svc)
     }
 
     if(interface_strs != NULL) {
-      fprintf(stderr, "(example-server) Found some interfaces:\n");
+      fprintf(stderr, "(display-launcher) Found some interfaces:\n");
       for(i=0; interface_strs[i] != NULL; i++)
 	fprintf(stderr, "\t%d: %s\n", i, interface_strs[i]);
       fprintf(stderr, "\n");
     }
 
-    fprintf(stderr, "(example-server) dbus proxy making call (publish)..\n");
+    fprintf(stderr, "(display-launcher) dbus proxy making call (publish)..\n");
 
     gport = atoi(svc);
 
@@ -214,7 +214,7 @@ int main(int argc, char *argv[])
     fprintf(stderr, "(display-launcher) bound to localhost:%s..\n", svc);
 
     while(1) {
-	struct timeval tv = { .tv_sec = 10 };
+	struct timeval tv = { .tv_sec = 3600 };
 
 	fprintf(stderr, "(display-launcher) registering with KCM..\n");
 

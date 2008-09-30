@@ -387,14 +387,13 @@ end_usage(void *conn_data, struct mrpc_message *msg,
 	      S_IRUSR|S_IWUSR);
     close(fd);
 
-    *out = malloc(strlen(state->persistent_state) + 6);
-
-    if (in) {
+    if (in && state->persistent_state) {
+        *out = malloc(strlen(state->persistent_state) + 6);
 	sprintf(*out, "%s.diff", state->persistent_state);
 	fprintf(stderr,"(display-launcher) client told to retrieve state: %s\n",
 		*out);
     }
-    else (*out)[0] = '\0';
+    else *out = strdup("");
 
     return 0;
 }
