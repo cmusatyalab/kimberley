@@ -5,8 +5,8 @@
 # Use a 5:3 screen ratio, maximizing the size of the X dimension
 # on the display
 #
-
-x_res=$(xdpyinfo | awk '/dimensions: {print $2}' | head -1 | cut -dx -f1)
+export DISPLAY=:0
+x_res=$(xdpyinfo | awk '/dimensions:/ {print $2}' | head -1 | cut -dx -f1)
 y_res=$(expr $x_res \* 3 / 5)
 resolution="${x_res}x${y_res}"
 
@@ -17,17 +17,19 @@ resolution="${x_res}x${y_res}"
 scale=`echo "770/${x_res}"`
 
 echo "Local resolution: $resolution"
-echo x11vnc -once -display :0.0 -scale $scale 
+echo x11vnc -once -localhost -display :0 -scale $scale 
 
-x11vnc -once -display :0.0 -scale $scale > /tmp/x11vnc_port 2> /tmp/x11vnc_err &
+x11vnc -once -localhost -display :0 -scale $scale > /tmp/x11vnc_port 2> /tmp/x11vnc_err &
 
 
 ########################################################################
 # Begin running dekimberlize in this new VM asap to load application
 #
+xscreensaver-command -deactivate
 
-DISPLAY=:0.0 dekimberlize $@
+dekimberlize "$@"
 
+#xscreensaver-command -activate
 
 ########################################################################
 # Once dekimberlize finishes, take down processes brought 
@@ -35,3 +37,4 @@ DISPLAY=:0.0 dekimberlize $@
 #
 
 killall x11vnc
+rm -f /tmp/x11vnc_port
