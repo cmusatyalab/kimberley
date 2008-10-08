@@ -188,10 +188,13 @@ echo "Snapshot, VM launch: $DIFF" >> ${log_filename}
 #
 
 START=$(date +%s)
-echo
-echo "Executing install script '$install_script' inside VM.."
-( echo 'wget -O- http://128.2.216.108 >/dev/null' # wait for network
-  cat "$install_script" ) | RUN
+if [ -s "$install_script" ]
+then
+  echo
+  echo "Executing install script '$install_script' inside VM.."
+  ( echo 'wget -O- http://128.2.216.108 >/dev/null' # wait for network
+    cat "$install_script" ) | RUN
+fi
 
 echo
 echo "Executing application script '$execute_script' inside VM.."
