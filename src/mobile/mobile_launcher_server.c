@@ -50,7 +50,7 @@ launch_display_scripts(void *arg) {
 
   fprintf(stderr, "(display-launcher) Display scripts completed.\n");
 
-  pthread_exit((void *)0);
+  exit(0);
 }
 
 
@@ -147,6 +147,11 @@ handle_dekimberlize_thread_setup() {
 
   port = atoi(port_str);
 
+  /* Sleep for a couple of seconds before registering. */
+  fprintf(stderr, "(display-launcher) Waiting for VNC server to finish startup\n");
+  struct timeval tv = { .tv_sec = 5 };
+  select(0, NULL, NULL, NULL, &tv);
+
   fprintf(stderr, "(display-launcher) Registering VNC port %u with Avahi\n",
 	  port);
 
@@ -207,7 +212,7 @@ load_vm_from_path_1_svc(char *vm_name, char *patch_path, int *result, struct svc
   fprintf(stderr, "(display-launcher) Preparing new VNC display with "
 	  "vm '%s', kimberlize patch '%s'..\n", vm_name, patch_path);
 
-  snprintf(command, ARG_MAX, "display_setup -f %s %s", patch_path, vm_name);
+  snprintf(command, ARG_MAX, "display_setup -f \"%s\" \"%s\"", patch_path, vm_name);
 
   *result = handle_dekimberlize_thread_setup();
 
@@ -256,19 +261,21 @@ load_vm_from_url_1_svc(char *vm_name, char *patch_URL, int *result,  struct svc_
   snprintf(command, ARG_MAX, "display_setup ");
 
   if(strlen(current_state.persistent_state_filename) > 0) {
-    snprintf(arg, PATH_MAX, "-a %s ", current_state.persistent_state_filename);
+    snprintf(arg, PATH_MAX, "-a \"%s\" ", current_state.persistent_state_filename);
     strncat(command, arg, PATH_MAX);
   }
 
   if(strlen(current_state.encryption_key_filename) > 0) {
-    snprintf(arg, PATH_MAX, "-d %s ", current_state.encryption_key_filename);
+    snprintf(arg, PATH_MAX, "-d \"%s\" ", current_state.encryption_key_filename);
     strncat(command, arg, PATH_MAX);
   }
   
-  snprintf(arg, PATH_MAX, "-i %s ", current_state.overlay_location);
+  snprintf(arg, PATH_MAX, "-i \"%s\" ", current_state.overlay_location);
   strncat(command, arg, PATH_MAX);
 
-  strncat(command, vm_name, PATH_MAX);
+  snprintf(arg, PATH_MAX, "\"%s\"", vm_name);
+  strncat(command, arg, PATH_MAX);
+
 
   *result = handle_dekimberlize_thread_setup();
 
@@ -321,20 +328,20 @@ load_vm_from_attachment_1_svc(char *vm_name, char *patch_file, int *result,  str
   snprintf(command, ARG_MAX, "display_setup ");
 
   if(strlen(current_state.persistent_state_filename) > 0) {
-    snprintf(arg, PATH_MAX, "-a %s ", current_state.persistent_state_filename);
+    snprintf(arg, PATH_MAX, "-a \"%s\" ", current_state.persistent_state_filename);
     strncat(command, arg, PATH_MAX);
   }
 
   if(strlen(current_state.encryption_key_filename) > 0) {
-    snprintf(arg, PATH_MAX, "-d %s ", current_state.encryption_key_filename);
+    snprintf(arg, PATH_MAX, "-d \"%s\" ", current_state.encryption_key_filename);
     strncat(command, arg, PATH_MAX);
   }
   
-  snprintf(arg, PATH_MAX, "-f %s ", current_state.overlay_location);
+  snprintf(arg, PATH_MAX, "-f \"%s\" ", current_state.overlay_location);
   strncat(command, arg, PATH_MAX);
 
-
-  strncat(command, vm_name, PATH_MAX);
+  snprintf(arg, PATH_MAX, "\"%s\"", vm_name);
+  strncat(command, arg, PATH_MAX);
 
   free(copy);
 
