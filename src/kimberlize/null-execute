@@ -1,1 +1,2 @@
 #!/bin/sh
+zenity --info --text="Close this dialog to start kimberlization process"
