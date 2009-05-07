@@ -14,57 +14,43 @@
 #
 
 #
-## Executes commands in the virtual machine by sending them over a unix domain socket
-#
-RUN()
-{
-	cat > /tmp/kimberlize.py << EOF
-import sys,socket
-s = socket.socket(socket.AF_UNIX)
-s.connect("/tmp/kimberley-COM1")
-for cmd in sys.stdin:
-  if cmd[0] == '#': continue
-  print "Running:", cmd[:-1]
-  s.send(cmd)
-  out = ''
-  while 1:
-    out = out + s.recv(1024)
-    if out[-4:] == '\r\n# ': break
-    if out[-4:] == '\r\n$ ': break
-  print out
-s.close()
-EOF
-	python /tmp/kimberlize.py
-}
-
-
-#
 ## Print the command's syntax.
 #
 usage()
 {
-    echo "usage: kimberlize [-e [-k encryption-key-file]] [-n]"
-    echo "                    <vm-name> <app-name> <install-script> <execute-script>"
+    echo "usage: kimberlize [-e [-k encryption-key-file]] [-n] <vm-name> <app-name>"
 }
 
 
 #
 ## Poll VirtualBox about a VM until it is running.
-##   $1: The vm's state
 ##   $2: The vm's name or UUID
 ##   $3: The number of seconds until timeout
 ##   $?: 1 if running, 0 if not
 #
-sleep_until_vm()
+sleep_until_vm_running()
 {
-    for ((i=0;i<$3;i+=1)); do
-	state=$(VBoxManage showvminfo "$2" -machinereadable | \
+    for ((i=0;i<$2;i+=1)); do
+	state=$(VBoxManage showvminfo "$1" -machinereadable | \
 			sed -ne 's/^VMState="\(.*\)"/\1/p')
-	[ "$state" = "$1" ] && return 1
+	[ "$state" = "running" ] && return 1
         sleep 0.1s
     done
     return 0
 }
+
+sleep_until_vm_not_running()
+{
+    for ((i=0;i<$2;i+=1)); do
+	state=$(VBoxManage showvminfo "$1" -machinereadable | \
+			sed -ne 's/^VMState="\(.*\)"/\1/p')
+	[ "$state" == "saved" ] && return 1
+	[ "$state" == "powered off" ] && return 1
+        sleep 0.1s
+    done
+    return 0
+}
+
 
 
 if [ $# -lt 2 ]; then
@@ -73,8 +59,6 @@ if [ $# -lt 2 ]; then
 fi
 
 compression=1
-install_script=""
-execute_script=""
 encryption=0
 encryption_keyfile=""
 overlay_filename=""
@@ -109,8 +93,6 @@ shift $(($OPTIND-1))
 
 vm_name="$1"
 app_name=$2
-install_script=${3:-${app_name}-install}
-execute_script=${4:-${app_name}-execute}
 log_filename=$2.log
 
 
@@ -120,20 +102,8 @@ if [ "$vm_name" = "" ]; then
     exit 1
 fi
 
-if [ "$install_script" = "" ]; then
-	echo "error: No application installation script supplied."
-    usage
-    exit 1
-fi
-
-if [ "$execute_script" = "" ]; then
-	echo "error: No application execution script supplied."
-    usage
-    exit 1
-fi
-
 KIMBERLIZESTART=$(date +%s)
-echo "#`date` : Kimberlize begin. ${vm_name}/${install_script}/${execute_script}" >> ${log_filename}
+echo "#`date` : Kimberlize begin. ${vm_name}" >> ${log_filename}
 
 echo
 echo "Installing application in VM '$vm_name'.."
@@ -142,19 +112,26 @@ echo "Installing application in VM '$vm_name'.."
 ########################################################################
 # Enable serial port and RDP over loopback
 #
-#VBoxManage modifyvm "$vm_name" -uartmode1 server /tmp/kimberley-COM1
 #VBoxManage modifyvm "$vm_name" -vrdp on -vrdpaddress 127.0.0.1
 
 ########################################################################
-# Create a preliminary snapshot of the virtual machine while it is suspended.
+# Check if kimberley base snapshot is present
 # This saves the in-memory state, allowing us to take a binary difference
 # later.
 #
 
 START=$(date +%s)
 echo
-echo "Snapshotting VM '$vm_name'.."
-VBoxManage snapshot "$vm_name" take kimberlize_base > /dev/null
+echo "Checking snapshots for VM '$vm_name'.."
+VBoxManage snapshot "$vm_name" showvminfo "kimberley base snapshot" > /dev/null
+if [ $? -ne 0 ]; then
+	echo
+	echo "Snapshotting VM '$vm_name'.."
+	VBoxManage snapshot "$vm_name" take "kimberley base snapshot" > /dev/null
+fi
+
+# revert back to the base snapshot state
+VBoxManage snapshot "$vm_name" discardcurrent -state > /dev/null
 if [ $? -ne 0 ]; then
 	echo `basename $0`: error: failed taking VM snapshot
     exit 1
@@ -176,49 +153,24 @@ fi
 
 echo
 echo "Resuming.."
-sleep_until_vm running "$vm_name" 300
-
+sleep_until_vm_running "$vm_name" 300
 END=$(date +%s)
 DIFF=$(( $END - $START ))
 echo "Snapshot, VM launch: $DIFF" >> ${log_filename}
 
-
 ########################################################################
-# Execute application installer and application inside VM
+# Wait until user closes VM
 #
 
 START=$(date +%s)
-if [ -s "$install_script" ]
-then
-  echo
-  echo "Executing install script '$install_script' inside VM.."
-  ( echo 'wget -O- http://128.2.216.108 >/dev/null' # wait for network
-    cat "$install_script" ) | RUN
-fi
 
 echo
-echo "Executing application script '$execute_script' inside VM.."
-( echo 'su -l -s /bin/sh kimberley'
-  echo 'export DISPLAY=:0'
-  cat "$execute_script" ) | RUN
-sleep 2
+echo "Waiting until user saves state.."
+sleep_until_vm_not_running "$vm_name" 36000
 
 END=$(date +%s)
 DIFF=$(( $END - $START ))
 echo "Application install and exec: $DIFF" >> ${log_filename}
-
-########################################################################
-# Tear down the VM, writing the in-memory state to disk (.sav)
-#
-
-echo
-echo "Suspending VM $vm_name (saving state).."
-VBoxManage controlvm "$vm_name" savestate > /dev/null
-if [ $? -ne 0 ]; then
-    echo `basename $0`: error: failed suspending VM state
-    exit 1
-fi
-
 
 ########################################################################
 # Parse the various UUIDs used in filename construction.
@@ -233,7 +185,7 @@ curr_snapshot_uuid=$(VBoxManage showvminfo "$vm_name" -machinereadable |
 curr_mem_state="$vmpath/Snapshots/{$curr_snapshot_uuid}.sav"
 
 disk_snapshot_uuid=$(cat "$vmpath/$vm_name.xml" | 
-	sed -ne 's/.*<HardDiskAttachment hardDisk="{\(.*\)}" .*/\1/p' | tail -1)
+	sed -ne 's/.*<Image uuid="{\(.*\)}".*/\1/p' | tail -1)
 disk_snapshot_file="$vmpath/Snapshots/{$disk_snapshot_uuid}.vdi"
 
 
@@ -268,13 +220,12 @@ rm -rf "/tmp/$vm_name"
 
 
 ########################################################################
-# Now clean up, deleting the unnecessary checkpoint and removing
-# the port forwarding.
+# Now clean up, roll back to the checkpoint
 #
 
 echo
 echo "Discarding modified state of VM '$vm_name' and reverting to the checkpoint.."
-VBoxManage snapshot "$vm_name" discardcurrent -all >/dev/null
+VBoxManage snapshot "$vm_name" discardcurrent --state >/dev/null
 if [ $? -ne 0 ]; then
     echo `basename $0`: error: failed discarding VM snapshot
 fi

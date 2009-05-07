@@ -206,11 +206,20 @@ rm -f /tmp/dekimberlize.resumed
 ## Create a base snapshot in the VM
 #
 echo
-echo "Creating base snapshot.."
+echo "Checking snapshots for VM '$vm_name'.."
+VBoxManage snapshot "$vm_name" showvminfo "kimberley base snapshot" > /dev/null
+if [ $? -ne 0 ]; then
+	echo
+	echo "Snapshotting VM '$vm_name'.."
+	VBoxManage snapshot "$vm_name" take "kimberley base snapshot" > /dev/null
+fi
 
-gettimeofday "dekimberlize creating base VM snapshot" >> /tmp/dekimberlize.log
-VBoxManage snapshot "$vmname" take kimberley_base > /dev/null
-gettimeofday "dekimberlize created base VM snapshot" >> /tmp/dekimberlize.log
+# revert back to the base snapshot state
+VBoxManage snapshot "$vm_name" discardcurrent -state > /dev/null
+if [ $? -ne 0 ]; then
+	echo `basename $0`: error: failed taking VM snapshot
+    exit 1
+fi
 
 base_snapshot_uuid=$(VBoxManage showvminfo "$vmname" -machinereadable |
 	sed -ne 's/^SnapshotUUID="\(.*\)"$/\1/p')
@@ -426,7 +435,7 @@ fi
 echo
 echo "Discarding dirty state and restoring the original VM image.."
 gettimeofday "dekimberlize reverting to base VM" >> /tmp/dekimberlize.log
-VBoxManage snapshot "$vmname" discardcurrent -all 
+VBoxManage snapshot "$vmname" discardcurrent --state 
 if [ $? -ne 0 ]; then
     echo `basename $0`: error: failed discarding VM state
     failure 
