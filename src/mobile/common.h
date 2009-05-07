@@ -3,6 +3,8 @@
 
 #include <rpc/rpc.h>
 
+#define ARG_MAX 255
+
 #define KCM_DBUS_SERVICE_NAME		"edu.cmu.cs.kimberley.kcm"
 #define KCM_DBUS_SERVICE_PATH		"/edu/cmu/cs/kimberley/kcm"
 #define LAUNCHER_KCM_SERVICE_NAME	"_launcher_kcm._tcp"
